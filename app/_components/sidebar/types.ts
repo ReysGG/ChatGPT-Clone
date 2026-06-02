@@ -21,4 +21,5 @@ export interface SidebarProps {
   onNewChat: () => void;
   onDelete: (id: string) => void;
   user: SidebarUser;
+  isOpen?: boolean;
 }

@@ -3,15 +3,17 @@ import { MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 interface ChatSearchProps {
   value: string;
   onChange: (next: string) => void;
+  ref?: React.Ref<HTMLInputElement>;
 }
 
-export function ChatSearch({ value, onChange }: ChatSearchProps): React.ReactElement {
+export function ChatSearch({ value, onChange, ref }: ChatSearchProps): React.ReactElement {
   return (
     <div className="group/search relative">
       <MagnifyingGlassIcon
         className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted transition-colors group-focus-within/search:text-white/80"
       />
       <input
+        ref={ref}
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}

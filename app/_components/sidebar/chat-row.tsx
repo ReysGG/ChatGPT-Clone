@@ -61,7 +61,7 @@ export function ChatRow({
               onDelete();
             }}
             aria-label={`Delete chat ${title}`}
-            className="rounded p-1 text-muted opacity-0 transition hover:bg-white/10 hover:text-white group-hover:opacity-100"
+            className="rounded p-1 text-muted opacity-0 transition hover:bg-white/10 hover:text-white group-hover:opacity-100 focus:opacity-100"
           >
             <TrashIcon className="h-3.5 w-3.5" />
           </button>

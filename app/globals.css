@@ -5,6 +5,11 @@
 @layer base {
   /* shadcn neutral tokens (Radix Nova preset) — used by UntitledUI file-upload-base */
   :root {
+    --app-bg: #f7f7f8;
+    --app-sidebar: #ffffff;
+    --app-card: #ffffff;
+    --app-muted: #6b7280;
+
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
@@ -40,6 +45,11 @@
 
   /* App default = dark (per planning doc). We still expose .light for the toggle. */
   html.dark {
+    --app-bg: #000000;
+    --app-sidebar: #0F0F0F;
+    --app-card: #1F1F1F;
+    --app-muted: #A3A3A3;
+
     --background: #000000;
     --foreground: #ffffff;
     --card: #1F1F1F;
@@ -89,8 +99,73 @@ html, body {
   min-height: 100%;
 }
 
-/* Thin scrollbar to fit the dark minimal feel */
+/* Thin scrollbar to fit the minimal feel */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2A2A2A; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #3A3A3A; }
+
+/*
+  Light mode bridge for the original dark-first Tailwind classes.
+  Most app components were built with hardcoded classes like bg-bg, bg-card,
+  bg-sidebar, text-white, and text-muted. The theme toggle correctly removes
+  html.dark, but those fixed utility colors would keep the UI visually dark.
+  These overrides make the existing components react to html.dark without a
+  large component-by-component rewrite.
+*/
+html:not(.dark) body,
+html:not(.dark) .bg-bg {
+  background-color: #f7f7f8 !important;
+  color: #111827 !important;
+}
+
+html:not(.dark) .bg-sidebar {
+  background-color: #ffffff !important;
+}
+
+html:not(.dark) .bg-card {
+  background-color: #ffffff !important;
+}
+
+html:not(.dark) .text-white,
+html:not(.dark) .\!text-white,
+html:not(.dark) .\!text-white\/90,
+html:not(.dark) .\!text-white\/80,
+html:not(.dark) .text-white\/90,
+html:not(.dark) .text-white\/85,
+html:not(.dark) .text-white\/80,
+html:not(.dark) .text-white\/70 {
+  color: #111827 !important;
+}
+
+html:not(.dark) .text-muted,
+html:not(.dark) .\!text-muted,
+html:not(.dark) .placeholder\:text-muted::placeholder {
+  color: #6b7280 !important;
+}
+
+html:not(.dark) .border-white\/\[0\.06\],
+html:not(.dark) .border-white\/10,
+html:not(.dark) .ring-border {
+  border-color: #e5e7eb !important;
+}
+
+html:not(.dark) .ring-border {
+  --tw-ring-color: #e5e7eb !important;
+}
+
+html:not(.dark) .bg-white\/\[0\.03\],
+html:not(.dark) .bg-white\/\[0\.04\],
+html:not(.dark) .bg-white\/\[0\.05\],
+html:not(.dark) .bg-white\/\[0\.06\] {
+  background-color: #f3f4f6 !important;
+}
+
+html:not(.dark) .shadow-black\/20,
+html:not(.dark) .shadow-black\/30 {
+  --tw-shadow-color: rgb(17 24 39 / 0.08) !important;
+  --tw-shadow: var(--tw-shadow-colored) !important;
+}
+
+html:not(.dark) ::-webkit-scrollbar-thumb { background: #d1d5db; }
+html:not(.dark) ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }

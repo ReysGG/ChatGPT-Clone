@@ -1,6 +1,7 @@
 import { SparklesIcon } from "@heroicons/react/24/outline";
 import { CopyButton } from "./copy-button";
 import { FeedbackButton } from "./feedback-button";
+import { MarkdownContent } from "./markdown-content";
 import type { FeedbackValue, Message } from "./types";
 import { formatClockTime } from "./format";
 
@@ -36,8 +37,8 @@ export function AssistantMessage({
         <SparklesIcon className="size-4 text-violet-300" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="whitespace-pre-wrap rounded-2xl rounded-tl-md border border-white/[0.06] bg-card px-4 py-2.5 text-sm leading-relaxed text-white">
-          {message.content || (isStreaming ? "…" : "")}
+        <div className="rounded-2xl rounded-tl-md border border-white/[0.06] bg-card px-4 py-2.5 text-sm leading-relaxed text-white">
+          {message.content ? <MarkdownContent content={message.content} /> : isStreaming ? "…" : ""}
         </div>
         <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted">
           <span>{message.createdAt ?? formatClockTime()}</span>

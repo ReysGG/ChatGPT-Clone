@@ -9,10 +9,10 @@ module.exports = {
     extend: {
       colors: {
         // App palette (planning doc)
-        bg: "#000000",
-        sidebar: "#0F0F0F",
-        card: "#1F1F1F",
-        muted: "#A3A3A3",
+        bg: "var(--app-bg)",
+        sidebar: "var(--app-sidebar)",
+        card: "var(--app-card)",
+        muted: "var(--app-muted)",
         // shadcn tokens
         background: "var(--background)",
         foreground: "var(--foreground)",

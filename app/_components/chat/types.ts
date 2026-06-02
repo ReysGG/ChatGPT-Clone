@@ -17,13 +17,17 @@ export interface ChatHeaderProps {
   modelName: string;
   onPin?: () => void;
   onMore?: () => void;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 export interface MessageListProps {
   messages: Message[];
+  isLoading: boolean;
   isStreaming: boolean;
-  onCopy: (id: string, content: string) => void;
+  promptSeed: number;
   copiedId: string | null;
   feedback: Record<string, FeedbackValue | null>;
+  onCopy: (id: string, content: string) => void;
   onFeedback: (id: string, value: FeedbackValue) => void;
 }

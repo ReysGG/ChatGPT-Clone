@@ -1,16 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Bars3Icon } from "@heroicons/react/24/outline";
 import { Card, List, ListItem, Typography } from "./primitives";
 import { SIDEBAR_WIDTH_REM } from "./styles";
 import { formatRelative, useNow } from "./use-now";
 import { ChatRow } from "./chat-row";
 import { ChatSearch } from "./chat-search";
-import { NewChatButton } from "./new-chat-button";
 import { SidebarHeader } from "./sidebar-header";
 import { SidebarNav } from "./sidebar-nav";
-import { UpgradeCard } from "./upgrade-card";
+import { DeleteChatDialog } from "./delete-chat-dialog";
 import { UserMenu } from "@/components/user-menu";
 import type { ChatItem, SidebarProps } from "./types";
 
@@ -24,11 +23,12 @@ export function Sidebar({
   onNewChat,
   onDelete,
   user,
+  isOpen = true,
 }: SidebarProps): React.ReactElement {
   const [query, setQuery] = useState<string>("");
-  const [projectsOpen, setProjectsOpen] = useState<boolean>(false);
-  const [upgradeOpen, setUpgradeOpen] = useState<boolean>(true);
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
+  const [chatToDelete, setChatToDelete] = useState<ChatItem | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const now = useNow();
 
   const filtered = chats.filter((c) =>
@@ -48,23 +48,27 @@ export function Sidebar({
       </button>
 
       {/* Desktop sidebar */}
-      <aside className="hidden h-screen w-72 shrink-0 md:block">
-        <SidebarBody
-          filtered={filtered}
-          query={query}
-          onQueryChange={setQuery}
-          activeChatId={activeChatId}
-          onSelect={onSelect}
-          onDelete={onDelete}
-          onNewChat={onNewChat}
-          projectsOpen={projectsOpen}
-          onToggleProjects={() => setProjectsOpen((v) => !v)}
-          upgradeOpen={upgradeOpen}
-          onCloseUpgrade={() => setUpgradeOpen(false)}
-          onUpgrade={() => setUpgradeOpen(false)}
-          now={now}
-          user={user}
-        />
+      <aside
+        className={`hidden h-screen shrink-0 md:block transition-all duration-300 ease-in-out overflow-hidden ${
+          isOpen ? "w-72" : "w-0"
+        }`}
+      >
+        <div className="w-72 h-full">
+          <SidebarBody
+            filtered={filtered}
+            query={query}
+            onQueryChange={setQuery}
+            activeChatId={activeChatId}
+            onSelect={onSelect}
+            onDelete={onDelete}
+            onRequestDelete={setChatToDelete}
+            onNewChat={onNewChat}
+            onFocusSearch={() => searchInputRef.current?.focus()}
+            searchInputRef={searchInputRef}
+            now={now}
+            user={user}
+          />
+        </div>
       </aside>
 
       {/* Mobile drawer */}
@@ -86,12 +90,10 @@ export function Sidebar({
               activeChatId={activeChatId}
               onSelect={onSelect}
               onDelete={onDelete}
+              onRequestDelete={setChatToDelete}
               onNewChat={onNewChat}
-              projectsOpen={projectsOpen}
-              onToggleProjects={() => setProjectsOpen((v) => !v)}
-              upgradeOpen={upgradeOpen}
-              onCloseUpgrade={() => setUpgradeOpen(false)}
-              onUpgrade={() => setUpgradeOpen(false)}
+              onFocusSearch={() => searchInputRef.current?.focus()}
+              searchInputRef={searchInputRef}
               now={now}
               user={user}
               onCloseDrawer={() => setDrawerOpen(false)}
@@ -99,6 +101,17 @@ export function Sidebar({
           </div>
         </div>
       )}
+
+      <DeleteChatDialog
+        open={chatToDelete !== null}
+        chat={chatToDelete}
+        onClose={() => setChatToDelete(null)}
+        onConfirm={() => {
+          if (!chatToDelete) return;
+          onDelete(chatToDelete.id);
+          setChatToDelete(null);
+        }}
+      />
     </>
   );
 }
@@ -114,12 +127,10 @@ interface SidebarBodyProps {
   activeChatId: string | null;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
+  onRequestDelete: (chat: ChatItem) => void;
   onNewChat: () => void;
-  projectsOpen: boolean;
-  onToggleProjects: () => void;
-  upgradeOpen: boolean;
-  onCloseUpgrade: () => void;
-  onUpgrade: () => void;
+  onFocusSearch: () => void;
+  searchInputRef: React.RefObject<HTMLInputElement | null>;
   now: number | null;
   user: SidebarProps["user"];
   onCloseDrawer?: () => void;
@@ -132,12 +143,10 @@ function SidebarBody({
   activeChatId,
   onSelect,
   onDelete,
+  onRequestDelete,
   onNewChat,
-  projectsOpen,
-  onToggleProjects,
-  upgradeOpen,
-  onCloseUpgrade,
-  onUpgrade,
+  onFocusSearch,
+  searchInputRef,
   now,
   user,
   onCloseDrawer,
@@ -146,24 +155,22 @@ function SidebarBody({
     <Card className="flex h-full w-full max-w-[18rem] flex-col !bg-sidebar !text-white shadow-xl shadow-black/30 rounded-none border-r border-white/[0.06] overflow-hidden">
       <SidebarHeader onClose={onCloseDrawer ?? (() => undefined)} />
 
-      <div className="px-4 pt-1">
-        <NewChatButton onClick={onNewChat} />
+      <SidebarNav onNewChat={onNewChat} onFocusSearch={onFocusSearch} />
+
+      <div className="sr-only">
+        <ChatSearch ref={searchInputRef} value={query} onChange={onQueryChange} />
       </div>
 
-      <div className="mt-5 px-5">
+      <div className="mt-4 px-5">
         <Typography
           variant="small"
-          className="!text-muted !text-[11px] !font-semibold !uppercase !tracking-[0.08em]"
+          className="!text-white/90 !text-[13px] !font-semibold"
         >
-          Recent
+          Recents
         </Typography>
       </div>
 
-      <div className="mt-2 px-4">
-        <ChatSearch value={query} onChange={onQueryChange} />
-      </div>
-
-      <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-3">
+      <div className="mt-1 min-h-0 flex-1 overflow-y-auto px-3">
         <List className="!mt-0 !gap-0 !p-0">
           {filtered.length === 0 ? (
             <ListItem
@@ -181,31 +188,15 @@ function SidebarBody({
                 title={c.title}
                 relative={now == null ? "—" : formatRelative(c.updatedAt, now)}
                 onClick={() => onSelect(c.id)}
-                onDelete={() => onDelete(c.id)}
+                onDelete={() => onRequestDelete(c)}
               />
             ))
           )}
         </List>
       </div>
 
-      <div className="px-4 pt-2">
-        <hr className="border-white/[0.06]" />
-      </div>
-
-      <SidebarNav
-        projectsOpen={projectsOpen}
-        onToggleProjects={onToggleProjects}
-      />
-
-      <div className="mt-auto space-y-3 px-4 pb-4 pt-3">
-        <UpgradeCard
-          open={upgradeOpen}
-          onClose={onCloseUpgrade}
-          onUpgrade={onUpgrade}
-        />
-        <div className="px-1">
-          <UserMenu user={user} onUpgrade={onCloseUpgrade} />
-        </div>
+      <div className="px-4 pb-4 pt-3">
+        <UserMenu user={user} onUpgrade={() => undefined} />
       </div>
     </Card>
   );

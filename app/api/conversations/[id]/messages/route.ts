@@ -1,0 +1,34 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import {
+  assertConversationOwner,
+  getOrCreateDefaultUser,
+  serializeMessage,
+} from "@/lib/chat-db";
+
+export const dynamic = "force-dynamic";
+
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
+export async function GET(_request: NextRequest, context: RouteContext) {
+  try {
+    const { id } = await context.params;
+    const user = await getOrCreateDefaultUser();
+    await assertConversationOwner(id, user.id);
+
+    const messages = await prisma.message.findMany({
+      where: { conversationId: id },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return NextResponse.json({ messages: messages.map(serializeMessage) });
+  } catch (error) {
+    const message = (error as Error).message;
+    return NextResponse.json(
+      { error: message === "CONVERSATION_NOT_FOUND" ? "Conversation not found" : message },
+      { status: message === "CONVERSATION_NOT_FOUND" ? 404 : 500 }
+    );
+  }
+}

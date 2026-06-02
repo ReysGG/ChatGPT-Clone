@@ -1,6 +1,4 @@
-import { PlusIcon } from "@heroicons/react/24/solid";
-import { cn } from "@/lib/utils";
-import { PURPLE_GRAD, PURPLE_GRAD_HOVER } from "./styles";
+import { PencilSquareIcon } from "@heroicons/react/24/outline";
 
 interface NewChatButtonProps {
   onClick: () => void;
@@ -11,13 +9,9 @@ export function NewChatButton({ onClick }: NewChatButtonProps): React.ReactEleme
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        "flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/20",
-        PURPLE_GRAD,
-        PURPLE_GRAD_HOVER
-      )}
+      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/90 transition hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
     >
-      <PlusIcon className="h-5 w-5" />
+      <PencilSquareIcon className="h-5 w-5 text-white/80" />
       New chat
     </button>
   );

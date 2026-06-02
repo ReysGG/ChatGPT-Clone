@@ -14,7 +14,7 @@ export function SidebarHeader({ onClose }: SidebarHeaderProps): React.ReactEleme
         <BrandLogo />
         <Typography
           variant="h5"
-          className="!text-base !font-semibold !text-white"
+          className="!text-base !font-semibold text-foreground"
         >
           AI Chat
         </Typography>
@@ -22,7 +22,7 @@ export function SidebarHeader({ onClose }: SidebarHeaderProps): React.ReactEleme
       <div className="flex items-center gap-1">
         <AnimatedThemeToggler
           variant="circle"
-          className="rounded-md p-1.5 text-white hover:bg-white/10"
+          className="rounded-md p-1.5 text-foreground hover:bg-black/5 dark:hover:bg-white/10"
         />
         <button
           type="button"

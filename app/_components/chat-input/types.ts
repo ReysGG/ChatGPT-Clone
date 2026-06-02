@@ -8,5 +8,6 @@ export interface UploadedFile {
 export interface ChatInputProps {
   onSend: (message: string, files: UploadedFile[]) => void;
   isStreaming?: boolean;
+  isEmpty?: boolean;
   onStop?: () => void;
 }
