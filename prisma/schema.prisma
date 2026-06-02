@@ -1,0 +1,128 @@
+// Starter models — replace with your own
+// Domain: Personal AI Chat App (conversations <-> messages is the 1-to-many relation)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  name          String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  conversations Conversation[]
+  settings      Setting[]
+  tags          Tag[]
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  title     String
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[] // one-to-many relation
+  tags      ConversationTag[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String       // "user" | "assistant" | "system"
+  content        String
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+}
+
+model Setting {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  defaultModel  String?
+  systemPrompt  String?
+  temperature   Float    @default(0.7)
+  darkMode      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Tag {
+  id        String            @id @default(cuid())
+  name      String            @unique
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  links     ConversationTag[]
+  createdAt DateTime          @default(now())
+}
+
+model ConversationTag {
+  conversationId String
+  tagId          String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  tag            Tag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, tagId])
+  @@index([tagId])
+}
+
+model PromptTemplate {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  category  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Memory {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Upload {
+  id           String   @id @default(cuid())
+  filename     String
+  mimeType     String
+  sizeBytes    Int
+  storagePath  String
+  createdAt    DateTime @default(now())
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  url       String
+  title     String?
+  createdAt DateTime @default(now())
+}
