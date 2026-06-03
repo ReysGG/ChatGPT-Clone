@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { StopIcon } from "@heroicons/react/24/solid";
 import { MicrophoneIcon, PaperClipIcon } from "@heroicons/react/24/outline";
-import { ChevronDownIcon, GlobeIcon, ImageIcon, PencilLineIcon, WandSparklesIcon, Plus, AudioLines } from "lucide-react";
+import { ChevronDownIcon, GlobeIcon, ImageIcon, PencilLineIcon, WandSparklesIcon, Plus, AudioLines, BookOpen } from "lucide-react";
 import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
 import { BorderBeam } from "@/components/ui/border-beam";
 import { FileUpload } from "@/components/application/file-upload/file-upload-base";
 import type { ChatInputProps, UploadedFile } from "./types";
+import { PromptLibraryModal } from "../prompt-library-modal";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ACCEPTED_TYPES = ".pdf,.txt,.md,.markdown,image/*";
@@ -34,37 +35,149 @@ export function ChatInput({
   isStreaming = false,
   isEmpty = false,
   onStop,
+  session,
+  onLoginClick,
 }: ChatInputProps): React.ReactElement {
   const [value, setValue] = useState<string>("");
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [showUploader, setShowUploader] = useState<boolean>(false);
+  const [isLibraryOpen, setIsLibraryOpen] = useState<boolean>(false);
+  const [webSearch, setWebSearch] = useState<boolean>(false);
+  const [uploadingFiles, setUploadingFiles] = useState<
+    Record<string, { progress: number; error?: string; fileObject?: File }>
+  >({});
 
-  const canSend = value.trim().length > 0 || files.length > 0;
+  const isAnyUploading = Object.values(uploadingFiles).some((u) => !u.error);
+  const canSend = (value.trim().length > 0 || files.length > 0) && !isAnyUploading && !isStreaming;
+
+  const uploadFile = async (file: File, tempId: string) => {
+    setUploadingFiles((prev) => ({
+      ...prev,
+      [tempId]: { progress: 10, fileObject: file },
+    }));
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/uploads", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Gagal mengunggah berkas");
+      }
+
+      const { upload } = await res.json();
+
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === tempId
+            ? {
+                id: upload.id,
+                name: upload.filename,
+                size: upload.sizeBytes,
+                type: upload.mimeType,
+              }
+            : f
+        )
+      );
+
+      setUploadingFiles((prev) => {
+        const copy = { ...prev };
+        delete copy[tempId];
+        return copy;
+      });
+    } catch (error) {
+      console.error("Gagal upload file:", error);
+      setUploadingFiles((prev) => ({
+        ...prev,
+        [tempId]: {
+          ...prev[tempId],
+          progress: 0,
+          error: (error as Error).message || "Gagal mengunggah",
+        },
+      }));
+    }
+  };
+
+  const handleRetry = (tempId: string) => {
+    const fileObj = uploadingFiles[tempId]?.fileObject;
+    if (fileObj) {
+      void uploadFile(fileObj, tempId);
+    }
+  };
 
   const handleSend = (message = value): void => {
     const trimmed = message.trim();
-    if ((!trimmed && files.length === 0) || isStreaming) return;
-    onSend(trimmed, files);
+    if ((!trimmed && files.length === 0) || isStreaming || isAnyUploading) return;
+    onSend(trimmed, files, webSearch);
     setValue("");
     setFiles([]);
     setShowUploader(false);
   };
 
   const handleDropFiles = (dropped: FileList): void => {
-    const next: UploadedFile[] = Array.from(dropped).map((f, i) => ({
-      id: `${Date.now()}-${i}`,
-      name: f.name,
-      size: f.size,
-      type: f.type,
-    }));
-    setFiles((prev) => [...prev, ...next]);
-    setShowUploader(true);
+    if (!session.isAuthenticated) {
+      onLoginClick();
+      return;
+    }
+
+    Array.from(dropped).forEach((f, i) => {
+      const tempId = `temp-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 6)}`;
+      const newFile: UploadedFile = {
+        id: tempId,
+        name: f.name,
+        size: f.size,
+        type: f.type,
+      };
+
+      setFiles((prev) => [...prev, newFile]);
+      setShowUploader(true);
+
+      void uploadFile(f, tempId);
+    });
   };
 
   if (isEmpty && !isStreaming) {
     return (
       <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-4 pt-20">
         <FileUpload.Root className="w-full max-w-6xl">
+          {showUploader && files.length > 0 && (
+            <FileUpload.List className="mb-4 pointer-events-auto">
+              {files.map((f) => {
+                const uploadState = uploadingFiles[f.id];
+                return (
+                  <FileUpload.ListItemProgressBar
+                    key={f.id}
+                    name={f.name}
+                    size={f.size}
+                    progress={uploadState ? uploadState.progress : 100}
+                    failed={!!uploadState?.error}
+                    type={f.type as never}
+                    onDelete={async () => {
+                      setFiles((prev) => prev.filter((p) => p.id !== f.id));
+                      setUploadingFiles((prev) => {
+                        const copy = { ...prev };
+                        delete copy[f.id];
+                        return copy;
+                      });
+                      if (!f.id.startsWith("temp-")) {
+                        try {
+                          await fetch(`/api/uploads/${f.id}`, { method: "DELETE" });
+                        } catch (err) {
+                          console.error("Gagal menghapus upload:", err);
+                        }
+                      }
+                    }}
+                    onRetry={() => handleRetry(f.id)}
+                  />
+                );
+              })}
+            </FileUpload.List>
+          )}
           <div className="pointer-events-auto w-full max-w-6xl translate-y-4">
             {showUploader ? (
               <div className="flex w-full items-end gap-2 rounded-[28px] border border-white/10 bg-[#1f1f1f] p-2 shadow-2xl shadow-black/30">
@@ -114,9 +227,10 @@ export function ChatInput({
                   >
                     <Plus className="size-5" />
                   </button>
-                  <div className="absolute inset-y-0 left-12 right-[195px] z-40 flex items-center">
+                  <div className="absolute inset-y-0 left-12 right-[285px] z-40 flex items-center">
                     <PlaceholdersAndVanishInput
                       placeholders={PLACEHOLDERS}
+                      value={value}
                       onChange={(e) => setValue(e.target.value)}
                       onSubmit={(e) => {
                         e.preventDefault();
@@ -128,7 +242,29 @@ export function ChatInput({
                   </div>
                   <button
                     type="button"
-                    className="absolute right-[108px] top-1/2 z-[60] inline-flex -translate-y-1/2 items-center gap-1 rounded-full px-2 py-1 text-sm text-zinc-400 transition hover:text-white"
+                    onClick={() => setWebSearch((prev) => !prev)}
+                    className={`absolute right-[240px] top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full transition ${
+                      webSearch
+                        ? "bg-violet-500/20 text-violet-400 hover:text-violet-300"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                    aria-label="Web Search"
+                    title={webSearch ? "Web Search (Aktif)" : "Web Search (Nonaktif)"}
+                  >
+                    <GlobeIcon className="size-[18px]" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsLibraryOpen(true)}
+                    className="absolute right-[108px] top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full text-zinc-400 transition hover:text-white"
+                    aria-label="Prompt Library"
+                    title="Prompt Library"
+                  >
+                    <BookOpen className="size-[18px]" />
+                  </button>
+                  <button
+                    type="button"
+                    className="absolute right-[152px] top-1/2 z-[60] inline-flex -translate-y-1/2 items-center gap-1 rounded-full px-2 py-1 text-sm text-zinc-400 transition hover:text-white"
                   >
                     Extended
                     <ChevronDownIcon className="size-3.5" />
@@ -163,6 +299,11 @@ export function ChatInput({
                       <button
                         key={action.label}
                         type="button"
+                        onClick={() => {
+                          if (action.label === "Look something up") {
+                            setWebSearch(true);
+                          }
+                        }}
                         className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3.5 py-2 text-sm text-white/80 transition hover:border-white/20 hover:bg-white/[0.04] hover:text-white"
                       >
                         <Icon className="h-4 w-4" />
@@ -184,18 +325,35 @@ export function ChatInput({
       <FileUpload.Root>
         {showUploader && files.length > 0 && (
           <FileUpload.List>
-            {files.map((f) => (
-              <FileUpload.ListItemProgressBar
-                key={f.id}
-                name={f.name}
-                size={f.size}
-                progress={100}
-                type={f.type as never}
-                onDelete={() =>
-                  setFiles((prev) => prev.filter((p) => p.id !== f.id))
-                }
-              />
-            ))}
+            {files.map((f) => {
+              const uploadState = uploadingFiles[f.id];
+              return (
+                <FileUpload.ListItemProgressBar
+                  key={f.id}
+                  name={f.name}
+                  size={f.size}
+                  progress={uploadState ? uploadState.progress : 100}
+                  failed={!!uploadState?.error}
+                  type={f.type as never}
+                  onDelete={async () => {
+                    setFiles((prev) => prev.filter((p) => p.id !== f.id));
+                    setUploadingFiles((prev) => {
+                      const copy = { ...prev };
+                      delete copy[f.id];
+                      return copy;
+                    });
+                    if (!f.id.startsWith("temp-")) {
+                      try {
+                        await fetch(`/api/uploads/${f.id}`, { method: "DELETE" });
+                      } catch (err) {
+                        console.error("Gagal menghapus upload:", err);
+                      }
+                    }
+                  }}
+                  onRetry={() => handleRetry(f.id)}
+                />
+              );
+            })}
           </FileUpload.List>
         )}
 
@@ -255,9 +413,10 @@ export function ChatInput({
             >
               <Plus className="size-5" />
             </button>
-            <div className="absolute inset-y-0 left-12 right-[195px] z-40 flex items-center">
+            <div className="absolute inset-y-0 left-12 right-[285px] z-40 flex items-center">
               <PlaceholdersAndVanishInput
                 placeholders={PLACEHOLDERS}
+                value={value}
                 onChange={(e) => setValue(e.target.value)}
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -269,7 +428,29 @@ export function ChatInput({
             </div>
             <button
               type="button"
-              className="absolute right-[108px] top-1/2 z-[60] inline-flex -translate-y-1/2 items-center gap-1 rounded-full px-2 py-1 text-sm text-zinc-400 transition hover:text-white"
+              onClick={() => setWebSearch((prev) => !prev)}
+              className={`absolute right-[240px] top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full transition ${
+                webSearch
+                  ? "bg-violet-500/20 text-violet-400 hover:text-violet-300"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+              aria-label="Web Search"
+              title={webSearch ? "Web Search (Aktif)" : "Web Search (Nonaktif)"}
+            >
+              <GlobeIcon className="size-[18px]" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsLibraryOpen(true)}
+              className="absolute right-[108px] top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full text-zinc-400 transition hover:text-white"
+              aria-label="Prompt Library"
+              title="Prompt Library"
+            >
+              <BookOpen className="size-[18px]" />
+            </button>
+            <button
+              type="button"
+              className="absolute right-[152px] top-1/2 z-[60] inline-flex -translate-y-1/2 items-center gap-1 rounded-full px-2 py-1 text-sm text-zinc-400 transition hover:text-white"
             >
               Extended
               <ChevronDownIcon className="size-3.5" />
@@ -302,6 +483,19 @@ export function ChatInput({
           {DISCLAIMER_TEXT}
         </p>
       </FileUpload.Root>
+
+      <PromptLibraryModal
+        isOpen={isLibraryOpen}
+        onClose={() => setIsLibraryOpen(false)}
+        onInsert={(body) => {
+          setValue(body);
+        }}
+        onSend={(body) => {
+          handleSend(body);
+        }}
+        session={session}
+        onLoginClick={onLoginClick}
+      />
     </div>
   );
 }

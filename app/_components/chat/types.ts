@@ -15,6 +15,8 @@ export type FeedbackValue = "up" | "down";
 export interface ChatHeaderProps {
   title: string;
   modelName: string;
+  activeTags?: Array<{ id: string; name: string }>;
+  onUpdateTags?: (tagNames: string[]) => Promise<void>;
   onPin?: () => void;
   onMore?: () => void;
   sessionRole?: "guest" | "user" | "admin";

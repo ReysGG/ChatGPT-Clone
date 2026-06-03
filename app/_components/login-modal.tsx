@@ -1,6 +1,7 @@
 "use client";
 
-import { AuthCard } from "./auth-card";
+import { AuthCard } from "@/components/auth-card";
+import { useModalAccessibility } from "../_hooks/use-modal-accessibility";
 import type { AuthSession } from "../_hooks/use-chat-state";
 
 interface LoginModalProps {

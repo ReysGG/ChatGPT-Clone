@@ -30,6 +30,7 @@ export function FeedbackButton({
       type="button"
       onClick={onClick}
       aria-label={label}
+      title={label}
       className={cn(
         "grid size-6 place-items-center rounded transition",
         active

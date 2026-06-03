@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
   UserCircleIcon,
@@ -11,7 +12,7 @@ import {
   MoonIcon,
   SunIcon,
   ComputerDesktopIcon,
-  SparklesIcon,
+  ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 
 type ThemeChoice = "light" | "dark" | "system";
@@ -31,6 +32,8 @@ interface UserMenuProps {
   onHelp?: () => void;
   onUpgrade?: () => void;
   onLogout?: () => void;
+  /** Show Admin Panel link — only for users with admin role */
+  isAdmin?: boolean;
 }
 
 const PURPLE_GRAD = "bg-gradient-to-r from-violet-500 to-indigo-500";
@@ -51,6 +54,7 @@ export function UserMenu({
   onHelp,
   onUpgrade,
   onLogout,
+  isAdmin = false,
 }: UserMenuProps) {
   const [open, setOpen] = React.useState(false);
   const [theme, setTheme] = React.useState<ThemeChoice>("dark");
@@ -297,6 +301,27 @@ export function UserMenu({
               }}
             />
           </div>
+
+          {/* Admin Panel — only visible for admins */}
+          {isAdmin && (
+            <div className="px-2 pb-1">
+              <Link
+                href="/admin"
+                onClick={close}
+                role="menuitem"
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition",
+                  "text-violet-300 hover:bg-violet-500/10 focus:bg-violet-500/10 focus:outline-none"
+                )}
+              >
+                <ShieldCheckIcon className="h-4 w-4" />
+                <span className="flex-1 text-left">Admin Panel</span>
+                <span className="rounded-full bg-violet-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-300">
+                  Admin
+                </span>
+              </Link>
+            </div>
+          )}
 
           {/* Sign out (separated) */}
           <div className="border-t border-white/[0.06] px-2 py-1.5">

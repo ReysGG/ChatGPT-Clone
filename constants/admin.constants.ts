@@ -1,0 +1,9 @@
+export const ADMIN_CONSTANTS = {
+  DEFAULT_MODEL: "gemini-2.5-flash-lite",
+  DEFAULT_SYSTEM_PROMPT: "You are a helpful personal AI assistant.",
+  DEFAULT_TEMPERATURE: 0.7,
+  MAX_MESSAGES_PER_CHAT: 100,
+  MAX_PROMPT_LENGTH: 4000,
+  MAX_MESSAGES_PER_USER_PER_DAY: 50,
+  RATE_LIMIT_MESSAGES_PER_MINUTE: 10,
+} as const;

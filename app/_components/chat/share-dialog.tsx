@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { XMarkIcon, ClipboardDocumentIcon, ClipboardDocumentCheckIcon, GlobeAltIcon, PowerIcon } from "@heroicons/react/24/outline";
 import { BorderBeam } from "@/components/ui/border-beam";
 import type { ChatItem } from "../sidebar/types";
+import { useModalAccessibility } from "../../_hooks/use-modal-accessibility";
+import { useToast } from "@/components/ui/toast-provider";
 
 interface ShareDialogProps {
   isOpen: boolean;
@@ -21,6 +23,8 @@ export function ShareDialog({
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const { success: toastSuccess, error: toastError } = useToast();
+  const { modalRef, handleBackdropClick } = useModalAccessibility(isOpen, onClose);
 
   useEffect(() => {
     if (isOpen) {
@@ -44,8 +48,11 @@ export function ShareDialog({
       const nextSharedState = !chat.isShared;
       await onShare(chat.id, nextSharedState);
       setIsCopied(false);
+      toastSuccess(nextSharedState ? "Chat berhasil dibagikan secara publik!" : "Berbagi chat dinonaktifkan.");
     } catch (err) {
-      setError((err as Error).message || "Failed to update share settings.");
+      const msg = (err as Error).message || "Gagal memperbarui status berbagi.";
+      setError(msg);
+      toastError(msg);
     } finally {
       setIsLoading(false);
     }
@@ -55,14 +62,20 @@ export function ShareDialog({
     try {
       await navigator.clipboard.writeText(shareUrl);
       setIsCopied(true);
+      toastSuccess("Tautan berhasil disalin!");
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
       setError("Gagal menyalin link ke clipboard.");
+      toastError("Gagal menyalin link.");
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+    <div
+      ref={modalRef}
+      onClick={handleBackdropClick}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+    >
       <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#111] p-5 text-white shadow-2xl">
         <BorderBeam
           size={90}

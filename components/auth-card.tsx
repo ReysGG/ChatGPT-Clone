@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { BorderBeam } from "@/components/ui/border-beam";
-import type { AuthSession } from "../_hooks/use-chat-state";
+import type { AuthSession } from "@/app/_hooks/use-chat-state";
+import { useModalAccessibility } from "@/app/_hooks/use-modal-accessibility";
 
 export type AuthMode = "login" | "register";
 
@@ -24,12 +25,18 @@ export function AuthCard({
   onClose,
   onSubmit,
 }: AuthCardProps): React.ReactElement | null {
+  const { modalRef, handleBackdropClick } = useModalAccessibility(isOpen, onClose || (() => {}));
+
   if (!isOpen) return null;
 
   const isRegister = mode === "register";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+    <div
+      ref={modalRef}
+      onClick={handleBackdropClick}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+    >
       <form
         onSubmit={(event) => {
           event.preventDefault();

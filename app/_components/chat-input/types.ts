@@ -1,3 +1,5 @@
+import type { AuthSession } from "../../_hooks/use-chat-state";
+
 export interface UploadedFile {
   id: string;
   name: string;
@@ -6,8 +8,10 @@ export interface UploadedFile {
 }
 
 export interface ChatInputProps {
-  onSend: (message: string, files: UploadedFile[]) => void;
+  onSend: (message: string, files: UploadedFile[], webSearch?: boolean) => void;
   isStreaming?: boolean;
   isEmpty?: boolean;
   onStop?: () => void;
+  session: AuthSession;
+  onLoginClick: () => void;
 }

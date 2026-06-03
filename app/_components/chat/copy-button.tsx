@@ -11,6 +11,7 @@ export function CopyButton({ copied, onClick }: CopyButtonProps): React.ReactEle
       type="button"
       onClick={onClick}
       aria-label="Copy"
+      title={copied ? "Copied" : "Copy to clipboard"}
       className="grid size-6 place-items-center rounded transition hover:bg-white/[0.06] hover:text-white"
     >
       {copied ? (

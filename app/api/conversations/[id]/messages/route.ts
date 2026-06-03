@@ -20,10 +20,14 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     const user = await getChatUser(session.userId);
     await assertConversationOwner(id, user.id);
 
+    // Limit to last 100 messages to prevent excessive data transfer
+    // on long conversations. Older messages can be loaded with pagination.
     const messages = await prisma.message.findMany({
       where: { conversationId: id },
-      orderBy: { createdAt: "asc" },
+      orderBy: { createdAt: "desc" },
+      take: 100,
     });
+    messages.reverse();
 
     return NextResponse.json({ messages: messages.map(serializeMessage) });
   } catch (error) {

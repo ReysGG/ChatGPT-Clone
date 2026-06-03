@@ -23,6 +23,9 @@ model User {
   tags          Tag[]
   sessions      Session[]
   accounts      Account[]
+  promptTemplates PromptTemplate[]
+  memories      Memory[]
+  uploads       Upload[]
 }
 
 model Session {
@@ -79,6 +82,7 @@ model Conversation {
   isShared  Boolean   @default(false)
   shareId   String?   @unique
   sharedAt  DateTime?
+  uploads   Upload[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -112,11 +116,14 @@ model Setting {
 
 model Tag {
   id        String            @id @default(cuid())
-  name      String            @unique
+  name      String
   userId    String
   user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   links     ConversationTag[]
   createdAt DateTime          @default(now())
+
+  @@unique([userId, name])
+  @@index([userId])
 }
 
 model ConversationTag {
@@ -131,28 +138,47 @@ model ConversationTag {
 
 model PromptTemplate {
   id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
   body      String
-  category  String?
+  category  String?  @default("Umum")
+  isGlobal  Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Memory {
   id        String   @id @default(cuid())
-  key       String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
   value     String
+  enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+  @@index([userId])
 }
 
 model Upload {
-  id           String   @id @default(cuid())
-  filename     String
-  mimeType     String
-  sizeBytes    Int
-  storagePath  String
-  createdAt    DateTime @default(now())
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  filename       String
+  mimeType       String
+  sizeBytes      Int
+  storagePath    String
+  extractedText  String?
+  createdAt      DateTime      @default(now())
+
+  @@index([userId])
+  @@index([conversationId])
 }
 
 model Note {
@@ -177,3 +203,46 @@ model Bookmark {
   title     String?
   createdAt DateTime @default(now())
 }
+
+model AppSetting {
+  id                         String   @id @default("global")
+  defaultModel               String   @default("gemini-2.5-flash-lite")
+  defaultSystemPrompt        String   @default("You are a helpful personal AI assistant.")
+  defaultTemperature         Float    @default(0.7)
+  registrationEnabled        Boolean  @default(true)
+  sharingEnabled             Boolean  @default(true)
+  maxMessagesPerChat         Int      @default(100)
+  maxPromptLength            Int      @default(4000)
+  maxMessagesPerUserPerDay   Int      @default(50)
+  rateLimitMessagesPerMinute Int      @default(10)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+}
+
+model UsageEvent {
+  id             String   @id @default(cuid())
+  userId         String
+  conversationId String?
+  type           String   // e.g., "chat_message"
+  provider       String?  // e.g., "gemini"
+  model          String?  // e.g., "gemini-2.5-flash-lite"
+  inputTokens    Int?
+  outputTokens   Int?
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+}
+
+model ActivityEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  type      String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+}
+
+

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bars3Icon, UserCircleIcon } from "@heroicons/react/24/outline";
 import { Card, List, ListItem, Typography } from "./primitives";
 import { SIDEBAR_WIDTH_REM } from "./styles";
@@ -23,20 +23,43 @@ export function Sidebar({
   onNewChat,
   onDelete,
   onRename,
+  onSearch,
   user,
   isAuthenticated,
+  sessionRole,
   onLoginClick,
+  onLogout,
   isOpen = true,
+  isLoading = false,
 }: SidebarProps): React.ReactElement {
   const [query, setQuery] = useState<string>("");
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [chatToDelete, setChatToDelete] = useState<ChatItem | null>(null);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const now = useNow();
 
-  const filtered = chats.filter((c) =>
-    c.title.toLowerCase().includes(query.toLowerCase())
+  useEffect(() => {
+    if (!onSearch) return;
+    const timer = setTimeout(() => {
+      void onSearch(query);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, onSearch]);
+
+  const allTags = Array.from(
+    new Set(chats.flatMap((c) => (c.tags || []).map((t) => t.name)))
   );
+
+  const filtered = chats.filter((c) => {
+    if (selectedTag && !c.tags?.some((t) => t.name === selectedTag)) {
+      return false;
+    }
+    if (!onSearch && query) {
+      return c.title.toLowerCase().includes(query.toLowerCase());
+    }
+    return true;
+  });
 
   return (
     <>
@@ -72,7 +95,13 @@ export function Sidebar({
             now={now}
             user={user}
             isAuthenticated={isAuthenticated}
+            sessionRole={sessionRole}
             onLoginClick={onLoginClick}
+            onLogout={onLogout}
+            allTags={allTags}
+            selectedTag={selectedTag}
+            onSelectTag={setSelectedTag}
+            isLoading={isLoading}
           />
         </div>
       </aside>
@@ -104,8 +133,14 @@ export function Sidebar({
               now={now}
               user={user}
               isAuthenticated={isAuthenticated}
+              sessionRole={sessionRole}
               onLoginClick={onLoginClick}
+              onLogout={onLogout}
+              allTags={allTags}
+              selectedTag={selectedTag}
+              onSelectTag={setSelectedTag}
               onCloseDrawer={() => setDrawerOpen(false)}
+              isLoading={isLoading}
             />
           </div>
         </div>
@@ -144,8 +179,14 @@ interface SidebarBodyProps {
   now: number | null;
   user: SidebarProps["user"];
   isAuthenticated: boolean;
+  sessionRole?: "guest" | "user" | "admin";
   onLoginClick: () => void;
+  onLogout?: () => void;
   onCloseDrawer?: () => void;
+  allTags: string[];
+  selectedTag: string | null;
+  onSelectTag: (tag: string | null) => void;
+  isLoading?: boolean;
 }
 
 function SidebarBody({
@@ -163,21 +204,106 @@ function SidebarBody({
   now,
   user,
   isAuthenticated,
+  sessionRole,
   onLoginClick,
+  onLogout,
   onCloseDrawer,
+  allTags,
+  selectedTag,
+  onSelectTag,
+  isLoading = false,
 }: SidebarBodyProps): React.ReactElement {
+  const handleNewChat = () => {
+    if (isAuthenticated) {
+      onNewChat();
+    } else {
+      onLoginClick();
+    }
+    onCloseDrawer?.();
+  };
+
+  const handleFocusSearch = () => {
+    if (isAuthenticated) {
+      onFocusSearch();
+    } else {
+      onLoginClick();
+    }
+    onCloseDrawer?.();
+  };
+
+  const handleSelect = (id: string) => {
+    onSelect(id);
+    onCloseDrawer?.();
+  };
+
+  const handleLoginClick = () => {
+    onLoginClick();
+    onCloseDrawer?.();
+  };
+
+  const handleLogout = () => {
+    onLogout?.();
+    onCloseDrawer?.();
+  };
+
+  const handleListKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    
+    const container = e.currentTarget;
+    const items = Array.from(
+      container.querySelectorAll<HTMLElement>('[role="button"][tabIndex="0"]')
+    );
+    
+    if (items.length === 0) return;
+    
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+    
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % items.length;
+      items[nextIndex].focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prevIndex = currentIndex === -1 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length;
+      items[prevIndex].focus();
+    }
+  };
+
   return (
     <Card className="flex h-full w-full max-w-[18rem] flex-col !bg-sidebar !text-white shadow-xl shadow-black/30 rounded-none border-r border-white/[0.06] overflow-hidden">
       <SidebarHeader onClose={onCloseDrawer ?? (() => undefined)} />
 
       <SidebarNav
-        onNewChat={isAuthenticated ? onNewChat : onLoginClick}
-        onFocusSearch={isAuthenticated ? onFocusSearch : onLoginClick}
+        onNewChat={handleNewChat}
+        onFocusSearch={handleFocusSearch}
       />
 
-      <div className="sr-only">
-        <ChatSearch ref={searchInputRef} value={query} onChange={onQueryChange} />
-      </div>
+      {isAuthenticated && (
+        <div className="mt-2 px-5">
+          <ChatSearch ref={searchInputRef} value={query} onChange={onQueryChange} />
+          {allTags.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1 max-h-20 overflow-y-auto custom-scrollbar">
+              {allTags.map((tag) => {
+                const isSelected = tag === selectedTag;
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => onSelectTag(isSelected ? null : tag)}
+                    className={`inline-block text-[10px] px-2 py-0.5 rounded transition font-medium ${
+                      isSelected
+                        ? "bg-violet-500 text-white shadow-sm"
+                        : "bg-white/[0.04] text-muted hover:bg-white/[0.08] hover:text-white"
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-4 px-5">
         <Typography
@@ -188,7 +314,10 @@ function SidebarBody({
         </Typography>
       </div>
 
-      <div className="mt-1 min-h-0 flex-1 overflow-y-auto px-3">
+      <div
+        className="mt-1 min-h-0 flex-1 overflow-y-auto px-3"
+        onKeyDown={handleListKeyDown}
+      >
         <List className="!mt-0 !gap-0 !p-0">
           {!isAuthenticated ? (
             <ListItem
@@ -199,6 +328,18 @@ function SidebarBody({
               <UserCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
               <span>Login untuk melihat chat pribadi.</span>
             </ListItem>
+          ) : isLoading ? (
+            <div className="space-y-3.5 px-3 py-2.5 animate-pulse">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="size-4 rounded bg-white/10 shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-10/12 rounded bg-white/10" />
+                    <div className="h-2 w-5/12 rounded bg-white/5" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : filtered.length === 0 ? (
             <ListItem
               disabled
@@ -215,7 +356,8 @@ function SidebarBody({
                 title={c.title}
                 relative={now == null ? "—" : formatRelative(c.updatedAt, now)}
                 isShared={c.isShared}
-                onClick={() => onSelect(c.id)}
+                tags={c.tags}
+                onClick={() => handleSelect(c.id)}
                 onDelete={() => onRequestDelete(c)}
                 onRename={onRename ? (newTitle) => onRename(c.id, newTitle) : undefined}
               />
@@ -226,11 +368,11 @@ function SidebarBody({
 
       <div className="px-4 pb-4 pt-3">
         {isAuthenticated && user ? (
-          <UserMenu user={user} onUpgrade={() => undefined} />
+          <UserMenu user={user} onLogout={handleLogout} onUpgrade={() => undefined} isAdmin={sessionRole === "admin"} />
         ) : (
           <button
             type="button"
-            onClick={onLoginClick}
+            onClick={handleLoginClick}
             className="flex w-full items-center gap-2.5 rounded-lg border border-white/[0.08] px-3 py-2 text-left text-sm text-white transition hover:bg-white/[0.06]"
           >
             <UserCircleIcon className="h-5 w-5 text-muted" />

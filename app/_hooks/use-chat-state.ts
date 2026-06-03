@@ -11,7 +11,8 @@ const STREAM_ASSISTANT_ID = "streaming-assistant";
 
 const DEFAULT_SETTINGS: ChatSettings = {
   defaultModel: "gemini-2.5-flash-lite",
-  systemPrompt: "You are a helpful personal AI assistant.",
+  // null = follow admin global system prompt
+  systemPrompt: null,
   temperature: 0.7,
 };
 
@@ -31,15 +32,17 @@ type StreamDone = {
 const nextId = (): string =>
   globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random()}`;
 
+const chatMessageTimeFormatter = new Intl.DateTimeFormat("id-ID", {
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
 const toMessage = (message: ApiMessage): Message => ({
   id: message.id,
   role: message.role === "assistant" ? "assistant" : "user",
   content: message.content,
   createdAt: message.createdAt
-    ? new Intl.DateTimeFormat("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }).format(new Date(message.createdAt))
+    ? chatMessageTimeFormatter.format(new Date(message.createdAt))
     : undefined,
 });
 
@@ -106,13 +109,15 @@ export interface UseChatState {
   createChat: () => void;
   deleteChat: (id: string) => void;
   renameChat: (id: string, title: string) => void;
-  sendMessage: (text: string, files: UploadedFile[]) => void;
+  sendMessage: (text: string, files: UploadedFile[], forceChatId?: string | null, webSearch?: boolean) => void;
   stopStreaming: () => void;
   copyMessage: (id: string, content: string) => void;
   rateMessage: (id: string, value: FeedbackValue) => void;
   saveSettings: (settings: ChatSettings) => Promise<void>;
   clearChats: () => void;
   shareChat: (id: string, isShared: boolean) => Promise<ChatItem | void>;
+  updateTags: (id: string, tagNames: string[]) => Promise<void>;
+  searchConversations: (query: string) => Promise<void>;
   login: (credentials: { email: string; password: string }) => Promise<AuthSession | void>;
   logout: () => void;
 }
@@ -241,12 +246,19 @@ export function useChatState(): UseChatState {
 
   const selectChat = useCallback(
     (id: string) => {
+      // Abort any in-flight stream before switching to prevent race conditions
+      // where the old stream writes into the newly selected conversation's state.
+      if (isStreaming) {
+        abortRef.current?.abort();
+        abortRef.current = null;
+        setIsStreaming(false);
+      }
       setActiveChatId(id);
       if (!messagesByChat[id]) {
         void loadMessages(id);
       }
     },
-    [loadMessages, messagesByChat]
+    [isStreaming, loadMessages, messagesByChat]
   );
 
   const createChat = useCallback(() => {
@@ -284,17 +296,20 @@ export function useChatState(): UseChatState {
   );
 
   const sendMessage = useCallback(
-    (text: string, files: UploadedFile[]) => {
+    (text: string, files: UploadedFile[], forceChatId?: string | null, webSearch?: boolean) => {
       if (isStreaming) return;
       if (!session.isAuthenticated) {
         setAuthError("Login diperlukan untuk mengirim pesan.");
         window.dispatchEvent(new CustomEvent("ai-chat-login-required", {
-          detail: { text, files },
+          detail: { text, files, webSearch },
         }));
         return;
       }
 
-      const targetChatId = activeChatId;
+      // `forceChatId` may be explicitly null (meaning "no override") or a real id.
+      // Both null and undefined should fall back to the currently active chat so that
+      // sending a message continues the existing conversation instead of creating a new one.
+      const targetChatId = forceChatId != null ? forceChatId : activeChatId;
       const optimisticChatId = targetChatId ?? `temp-${nextId()}`;
       const optimisticUserMessage: Message = {
         id: `temp-user-${nextId()}`,
@@ -338,6 +353,8 @@ export function useChatState(): UseChatState {
               systemPrompt: settings.systemPrompt,
               temperature: settings.temperature,
               stream: true,
+              uploadIds: files.map((f) => f.id),
+              webSearch,
             }),
             signal: controller.signal,
           });
@@ -476,7 +493,32 @@ export function useChatState(): UseChatState {
     abortRef.current?.abort();
     abortRef.current = null;
     setIsStreaming(false);
-  }, []);
+    if (activeChatId) {
+      setMessagesByChat((prev) => {
+        const existing = prev[activeChatId] ?? [];
+        const streamingMsg = existing.find((msg) => msg.id === STREAM_ASSISTANT_ID);
+        if (!streamingMsg) return prev;
+
+        // Preserve whatever partial content was streamed — replace the
+        // ephemeral STREAM_ASSISTANT_ID with a stable id so it stays visible.
+        const partialContent = streamingMsg.content.trim();
+        return {
+          ...prev,
+          [activeChatId]: existing.map((msg) =>
+            msg.id === STREAM_ASSISTANT_ID
+              ? {
+                  ...msg,
+                  id: `stopped-${nextId()}`,
+                  content:
+                    partialContent ||
+                    "_(Generasi dihentikan oleh pengguna.)_",
+                }
+              : msg
+          ),
+        };
+      });
+    }
+  }, [activeChatId]);
 
   const copyMessage = useCallback((id: string, content: string) => {
     void (async () => {
@@ -525,9 +567,10 @@ export function useChatState(): UseChatState {
             body: JSON.stringify({ title: newTitle }),
           }
         );
-        setChats((prev) =>
-          prev.map((chat) => (chat.id === id ? { ...chat, title: data.conversation.title } : chat))
-        );
+        setChats((prev) => {
+          const without = prev.filter((chat) => chat.id !== id);
+          return [data.conversation, ...without];
+        });
       } catch (error) {
         console.error("Failed to rename chat", error);
       }
@@ -600,6 +643,43 @@ export function useChatState(): UseChatState {
     })();
   }, [loadSettings]);
 
+  const updateTags = useCallback(async (id: string, tagNames: string[]) => {
+    try {
+      const data = await fetchJson<{ conversation: ApiConversation }>(
+        `/api/conversations/${id}/tags`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tagNames }),
+        }
+      );
+      setChats((prev) =>
+        prev.map((chat) =>
+          chat.id === data.conversation.id ? { ...chat, ...data.conversation } : chat
+        )
+      );
+    } catch (error) {
+      console.error("Failed to update tags", error);
+    }
+  }, []);
+
+  const searchConversations = useCallback(async (query: string) => {
+    if (!session.isAuthenticated) return;
+    const trimmed = query.trim();
+    if (!trimmed) {
+      await loadConversations();
+      return;
+    }
+    try {
+      const data = await fetchJson<{ conversations: ApiConversation[] }>(
+        `/api/search/conversations?q=${encodeURIComponent(trimmed)}`
+      );
+      setChats(data.conversations || []);
+    } catch (error) {
+      console.error("Search failed", error);
+    }
+  }, [session.isAuthenticated, loadConversations]);
+
   const clearAuthError = useCallback(() => {
     setAuthError(null);
   }, []);
@@ -630,6 +710,8 @@ export function useChatState(): UseChatState {
     saveSettings,
     clearChats,
     shareChat,
+    updateTags,
+    searchConversations,
     login,
     logout,
   };

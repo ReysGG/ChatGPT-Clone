@@ -18,6 +18,13 @@ export async function GET() {
     const user = await getChatUser(session.userId);
     const conversations = await prisma.conversation.findMany({
       where: { userId: user.id },
+      include: {
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
+      },
       orderBy: { updatedAt: "desc" },
     });
 
@@ -40,6 +47,13 @@ export async function POST() {
       data: {
         userId: user.id,
         title: "Percakapan baru",
+      },
+      include: {
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
       },
     });
 

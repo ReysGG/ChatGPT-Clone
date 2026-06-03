@@ -47,6 +47,7 @@ export function serializeConversation(conversation: {
   isShared?: boolean;
   shareId?: string | null;
   sharedAt?: Date | null;
+  tags?: Array<{ tag: { id: string; name: string } }>;
 }) {
   return {
     id: conversation.id,
@@ -56,6 +57,7 @@ export function serializeConversation(conversation: {
     isShared: Boolean(conversation.isShared),
     shareId: conversation.shareId ?? null,
     sharedAt: conversation.sharedAt?.toISOString() ?? null,
+    tags: conversation.tags ? conversation.tags.map((t) => ({ id: t.tag.id, name: t.tag.name })) : [],
   };
 }
 

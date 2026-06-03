@@ -169,3 +169,29 @@ html:not(.dark) .shadow-black\/30 {
 
 html:not(.dark) ::-webkit-scrollbar-thumb { background: #d1d5db; }
 html:not(.dark) ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* Toast Animations */
+@keyframes slide-up-fade {
+  from {
+    opacity: 0;
+    transform: translateY(1rem) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-slide-up-fade {
+  animation: slide-up-fade 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) { 
+  *, *::before, *::after { 
+    animation-duration: 0.01ms !important; 
+    animation-iteration-count: 1 !important; 
+    transition-duration: 0.01ms !important; 
+    scroll-behavior: auto !important; 
+  } 
+}
+

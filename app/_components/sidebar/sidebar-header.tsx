@@ -29,6 +29,7 @@ export function SidebarHeader({ onClose }: SidebarHeaderProps): React.ReactEleme
           onClick={onClose}
           className="rounded-md p-1.5 text-white hover:bg-white/10 md:hidden"
           aria-label="Close sidebar"
+          title="Close sidebar"
         >
           <XMarkIcon className="h-5 w-5" />
         </button>

@@ -69,7 +69,7 @@ async function main() {
     data: { title: "Summarize", body: "Summarize the following text in 3 bullet points:", category: "writing" },
   });
 
-  await prisma.memory.create({ data: { key: "favoriteModel", value: "gemini-2.5-flash" } });
+  await prisma.memory.create({ data: { userId: user.id, key: "favoriteModel", value: "gemini-2.5-flash" } });
 
   await prisma.note.create({ data: { title: "Project plan", body: "MVP: chat, history, settings, dark mode." } });
 
@@ -78,7 +78,7 @@ async function main() {
   await prisma.bookmark.create({ data: { url: "https://www.prisma.io/docs", title: "Prisma docs" } });
 
   await prisma.upload.create({
-    data: { filename: "readme.txt", mimeType: "text/plain", sizeBytes: 1024, storagePath: "/uploads/readme.txt" },
+    data: { userId: user.id, filename: "readme.txt", mimeType: "text/plain", sizeBytes: 1024, storagePath: "/uploads/readme.txt" },
   });
 
   console.log(`Seeded conversation ${conversation.id} for user ${user.email}`);

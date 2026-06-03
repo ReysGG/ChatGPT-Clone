@@ -11,6 +11,7 @@ interface ChatRowProps {
   title: string;
   relative: string;
   isShared?: boolean;
+  tags?: Array<{ id: string; name: string }>;
   onClick: () => void;
   onDelete: () => void;
   onRename?: (newTitle: string) => void;
@@ -21,6 +22,7 @@ export function ChatRow({
   title,
   relative,
   isShared = false,
+  tags = [],
   onClick,
   onDelete,
   onRename,
@@ -95,7 +97,22 @@ export function ChatRow({
           onClick={(e) => e.stopPropagation()}
         />
       ) : (
-        <span className="min-w-0 flex-1 truncate">{title}</span>
+        <div className="min-w-0 flex-1 flex flex-col items-start gap-0.5">
+          <span className="w-full truncate">{title}</span>
+          {tags && tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-0.5 max-w-full">
+              {tags.map((tag) => (
+                <span
+                  key={tag.id}
+                  className="inline-block bg-violet-500/10 text-violet-300 ring-1 ring-violet-500/20 text-[10px] px-1 py-0.2 rounded font-medium truncate max-w-[80px]"
+                  title={tag.name}
+                >
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       <ListItemSuffix>
@@ -123,6 +140,7 @@ export function ChatRow({
                     setIsEditing(true);
                   }}
                   aria-label={`Rename chat ${title}`}
+                  title="Rename chat"
                   className="rounded p-1 text-muted transition hover:bg-white/10 hover:text-white"
                 >
                   <PencilIcon className="h-3.5 w-3.5" />
@@ -136,6 +154,7 @@ export function ChatRow({
                   onDelete();
                 }}
                 aria-label={`Delete chat ${title}`}
+                title="Delete chat"
                 className="rounded p-1 text-muted transition hover:bg-white/10 hover:text-white"
               >
                 <TrashIcon className="h-3.5 w-3.5" />

@@ -8,6 +8,7 @@ import {
   serializeConversation,
 } from "@/lib/chat-db";
 import { prisma } from "@/lib/prisma";
+import { logActivityEvent } from "@/lib/activity";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const session = await requireUser();
     const { id } = await context.params;
     const body = ShareSchema.parse(await request.json());
+
+    const globalSettings = await prisma.appSetting.findFirst();
+    if (body.isShared && globalSettings && !globalSettings.sharingEnabled) {
+      return NextResponse.json(
+        { error: "Fitur berbagi percakapan sedang dinonaktifkan oleh administrator." },
+        { status: 403 }
+      );
+    }
+
     const user = await getChatUser(session.userId);
     const conversation = await assertConversationOwner(id, user.id);
 
@@ -41,6 +51,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
             sharedAt: null,
           },
     });
+
+    void logActivityEvent(
+      session.userId ?? null,
+      body.isShared ? "share_enabled" : "share_disabled",
+      {
+        conversationId: conversation.id,
+        conversationTitle: conversation.title,
+        shareId: updated.shareId,
+      }
+    );
 
     return NextResponse.json({ conversation: serializeConversation(updated) });
   } catch (error) {

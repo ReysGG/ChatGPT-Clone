@@ -15,6 +15,8 @@ export interface ChatPanelProps {
   feedback: Record<string, FeedbackValue | null>;
   onCopy: (id: string, content: string) => void;
   onFeedback: (id: string, value: FeedbackValue) => void;
+  activeTags?: Array<{ id: string; name: string }>;
+  onUpdateTags?: (tagNames: string[]) => Promise<void>;
   onMore?: () => void;
   sessionRole?: "guest" | "user" | "admin";
   isAuthenticated?: boolean;
@@ -39,6 +41,8 @@ export function ChatPanel({
   feedback,
   onCopy,
   onFeedback,
+  activeTags,
+  onUpdateTags,
   onMore,
   sessionRole,
   isAuthenticated,
@@ -58,6 +62,8 @@ export function ChatPanel({
         modelName={modelName}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={onToggleSidebar}
+        activeTags={activeTags}
+        onUpdateTags={onUpdateTags}
         onMore={onMore}
         sessionRole={sessionRole}
         isAuthenticated={isAuthenticated}

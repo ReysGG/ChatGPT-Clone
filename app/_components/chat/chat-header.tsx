@@ -2,10 +2,13 @@ import { BookmarkIcon, EllipsisHorizontalIcon, ShareIcon } from "@heroicons/reac
 import { SparklesIcon } from "@heroicons/react/24/outline";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import type { ChatHeaderProps } from "./types";
+import { TagsManager } from "./tags-manager";
 
 export function ChatHeader({
   title,
   modelName,
+  activeTags = [],
+  onUpdateTags,
   onPin,
   onMore,
   sessionRole = "guest",
@@ -55,9 +58,18 @@ export function ChatHeader({
               </span>
             )}
           </div>
-          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
-            <SparklesIcon className="h-3.5 w-3.5 text-violet-400" />
-            <span>{modelName}</span>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+            <div className="flex items-center gap-1.5">
+              <SparklesIcon className="h-3.5 w-3.5 text-violet-400" />
+              <span>{modelName}</span>
+            </div>
+            {isAuthenticated && onUpdateTags && (
+              <TagsManager
+                activeTags={activeTags}
+                onUpdateTags={onUpdateTags}
+                isAuthenticated={isAuthenticated}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -95,6 +107,7 @@ export function ChatHeader({
         <button
           type="button"
           aria-label="Pin chat"
+          title="Pin chat"
           onClick={onPin}
           className="grid size-8 place-items-center rounded-md text-muted transition hover:bg-white/[0.06] hover:text-white"
         >
@@ -103,6 +116,7 @@ export function ChatHeader({
         <button
           type="button"
           aria-label="More options"
+          title="More options"
           onClick={onMore}
           className="grid size-8 place-items-center rounded-md text-muted transition hover:bg-white/[0.06] hover:text-white"
         >

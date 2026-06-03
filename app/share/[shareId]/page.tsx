@@ -1,77 +1,108 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarkdownContent } from "@/app/_components/chat/markdown-content";
-import { prisma } from "@/lib/prisma";
+import { CopyButton } from "./copy-button";
+import { ArrowLeftIcon } from "@heroicons/react/24/outline";
+import { getSharedConversation } from "@/app/actions/share.actions";
 
 export const dynamic = "force-dynamic";
+
+import type { Metadata } from "next";
 
 interface SharePageProps {
   params: Promise<{ shareId: string }>;
 }
 
+export async function generateMetadata({ params }: SharePageProps): Promise<Metadata> {
+  const { shareId } = await params;
+  return {
+    title: `Shared Conversation`,
+    description: `View shared AI conversation ${shareId}`,
+  };
+}
+
+const sharedDateFormatter = new Intl.DateTimeFormat("id-ID", {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
 function formatSharedDate(date: Date): string {
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  return sharedDateFormatter.format(date);
 }
 
 export default async function SharePage({ params }: SharePageProps): Promise<React.ReactElement> {
   const { shareId } = await params;
-  const conversation = await prisma.conversation.findFirst({
-    where: {
-      shareId,
-      isShared: true,
-    },
-    include: {
-      messages: {
-        orderBy: { createdAt: "asc" },
-      },
-      user: {
-        select: { name: true },
-      },
-    },
-  });
+  const conversation = await getSharedConversation(shareId);
 
   if (!conversation) notFound();
 
   return (
-    <main className="min-h-screen bg-bg text-white">
+    <main className="min-h-screen bg-bg text-white selection:bg-violet-500/30 selection:text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 py-6 sm:px-6">
         <header className="border-b border-white/[0.08] pb-5">
-          <Link href="/" className="text-sm text-muted transition hover:text-white">
-            AI Chat
-          </Link>
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white">
-            {conversation.title}
-          </h1>
-          <p className="mt-2 text-sm text-muted">
-            Dibagikan oleh {conversation.user.name || "User"} pada {formatSharedDate(conversation.sharedAt ?? conversation.updatedAt)}
-          </p>
+          <div className="flex items-center justify-between gap-4">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 text-xs text-zinc-400 transition hover:text-white"
+            >
+              <ArrowLeftIcon className="h-3 w-3" />
+              <span>Back to app</span>
+            </Link>
+
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+              </span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
+                Shared conversation
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl font-bold tracking-tight text-white sm:text-2xl">
+                {conversation.title}
+              </h1>
+              <p className="mt-1.5 text-xs text-zinc-400 sm:text-sm">
+                Dibagikan oleh <span className="font-medium text-zinc-300">{conversation.user.name || "User"}</span> pada {formatSharedDate(conversation.sharedAt ?? conversation.updatedAt)}
+              </p>
+            </div>
+            <div className="shrink-0">
+              <CopyButton />
+            </div>
+          </div>
         </header>
 
         <ol className="flex-1 space-y-5 py-6">
-          {conversation.messages.map((message) => {
-            const isUser = message.role === "user";
+          {conversation.messages.length === 0 ? (
+            <div className="py-12 text-center text-sm text-zinc-500">
+              Tidak ada pesan dalam percakapan ini.
+            </div>
+          ) : (
+            conversation.messages.map((message) => {
+              const isUser = message.role === "user";
 
-            return (
-              <li key={message.id} className={isUser ? "flex justify-end" : "flex justify-start"}>
-                <article
-                  className={
-                    isUser
-                      ? "max-w-[85%] rounded-2xl rounded-br-md bg-violet-600 px-4 py-2.5 text-sm leading-relaxed text-white"
-                      : "max-w-full rounded-2xl rounded-tl-md border border-white/[0.08] bg-card px-4 py-2.5 text-sm leading-relaxed text-white sm:max-w-[85%]"
-                  }
-                >
-                  {isUser ? (
-                    <p className="whitespace-pre-wrap">{message.content}</p>
-                  ) : (
-                    <MarkdownContent content={message.content} />
-                  )}
-                </article>
-              </li>
-            );
-          })}
+              return (
+                <li key={message.id} className={isUser ? "flex justify-end" : "flex justify-start"}>
+                  <article
+                    className={
+                      isUser
+                        ? "max-w-[85%] rounded-2xl rounded-br-md bg-violet-600 px-4 py-2.5 text-sm leading-relaxed text-white shadow-md"
+                        : "max-w-full rounded-2xl rounded-tl-md border border-white/[0.08] bg-card px-4 py-2.5 text-sm leading-relaxed text-white shadow-sm sm:max-w-[85%]"
+                    }
+                  >
+                    {isUser ? (
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                    ) : (
+                      <MarkdownContent content={message.content} />
+                    )}
+                  </article>
+                </li>
+              );
+            })
+          )}
         </ol>
       </div>
     </main>

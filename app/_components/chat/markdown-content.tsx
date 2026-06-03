@@ -1,6 +1,20 @@
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+
+// Allow all default-safe elements plus code-highlighting class attributes.
+// defaultSchema blocks <script>, inline event handlers, javascript: hrefs, etc.
+const sanitizeSchema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    // Allow syntax-highlight classes added by rehype-highlight
+    code: [...(defaultSchema.attributes?.code ?? []), "className"],
+    span: [...(defaultSchema.attributes?.span ?? []), "className"],
+    pre: [...(defaultSchema.attributes?.pre ?? []), "className"],
+  },
+};
 
 interface MarkdownContentProps {
   content: string;
@@ -10,7 +24,7 @@ export function MarkdownContent({ content }: MarkdownContentProps): React.ReactE
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
-      rehypePlugins={[rehypeHighlight]}
+      rehypePlugins={[rehypeHighlight, [rehypeSanitize, sanitizeSchema]]}
       components={{
         a: ({ href, children }) => (
           <a
