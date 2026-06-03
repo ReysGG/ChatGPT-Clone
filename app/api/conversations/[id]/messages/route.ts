@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
   assertConversationOwner,
-  getOrCreateDefaultUser,
+  getChatUser,
   serializeMessage,
 } from "@/lib/chat-db";
+import { authErrorResponse, requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,8 @@ interface RouteContext {
 export async function GET(_request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const user = await getOrCreateDefaultUser();
+    const session = await requireUser();
+    const user = await getChatUser(session.userId);
     await assertConversationOwner(id, user.id);
 
     const messages = await prisma.message.findMany({
@@ -26,6 +28,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     return NextResponse.json({ messages: messages.map(serializeMessage) });
   } catch (error) {
     const message = (error as Error).message;
+    if (message === "AUTH_REQUIRED") return authErrorResponse("Login diperlukan untuk membuka chat.");
+
     return NextResponse.json(
       { error: message === "CONVERSATION_NOT_FOUND" ? "Conversation not found" : message },
       { status: message === "CONVERSATION_NOT_FOUND" ? 404 : 500 }

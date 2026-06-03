@@ -17,6 +17,14 @@ export interface ChatHeaderProps {
   modelName: string;
   onPin?: () => void;
   onMore?: () => void;
+  sessionRole?: "guest" | "user" | "admin";
+  isAuthenticated?: boolean;
+  onLoginClick?: () => void;
+  onLogout?: () => void;
+  isShareable?: boolean;
+  isShared?: boolean;
+  shareStatus?: "idle" | "sharing" | "copied";
+  onShare?: () => void;
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
 }

@@ -4,9 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatItem } from "../_components/sidebar/types";
 import type { FeedbackValue, Message } from "../_components/chat/types";
 import type { UploadedFile } from "../_components/chat-input/types";
+import type { ChatSettings } from "../_components/settings-modal";
 
 const COPY_FEEDBACK_MS = 1_500;
 const STREAM_ASSISTANT_ID = "streaming-assistant";
+
+const DEFAULT_SETTINGS: ChatSettings = {
+  defaultModel: "gemini-2.5-flash-lite",
+  systemPrompt: "You are a helpful personal AI assistant.",
+  temperature: 0.7,
+};
 
 type ApiConversation = ChatItem & { createdAt?: string };
 type ApiMessage = Omit<Message, "role"> & { role: string };
@@ -73,6 +80,7 @@ function replaceMessage(
   return copy;
 }
 
+
 function uniqueById(messages: Message[]): Message[] {
   return messages.filter(
     (message, index, arr) => arr.findIndex((item) => item.id === message.id) === index
@@ -88,13 +96,34 @@ export interface UseChatState {
   promptSeed: number;
   copiedId: string | null;
   feedback: Record<string, FeedbackValue | null>;
+  settings: ChatSettings;
+  isSavingSettings: boolean;
+  session: AuthSession;
+  isAuthLoading: boolean;
+  authError: string | null;
+  clearAuthError: () => void;
   selectChat: (id: string) => void;
   createChat: () => void;
   deleteChat: (id: string) => void;
+  renameChat: (id: string, title: string) => void;
   sendMessage: (text: string, files: UploadedFile[]) => void;
   stopStreaming: () => void;
   copyMessage: (id: string, content: string) => void;
   rateMessage: (id: string, value: FeedbackValue) => void;
+  saveSettings: (settings: ChatSettings) => Promise<void>;
+  clearChats: () => void;
+  shareChat: (id: string, isShared: boolean) => Promise<ChatItem | void>;
+  login: (credentials: { email: string; password: string }) => Promise<AuthSession | void>;
+  logout: () => void;
+}
+
+export interface AuthSession {
+  role: "guest" | "user" | "admin";
+  isAuthenticated: boolean;
+  userId?: string;
+  email?: string;
+  name?: string;
+  image?: string | null;
 }
 
 export function useChatState(): UseChatState {
@@ -105,6 +134,11 @@ export function useChatState(): UseChatState {
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Record<string, FeedbackValue | null>>({});
+  const [settings, setSettings] = useState<ChatSettings>(DEFAULT_SETTINGS);
+  const [isSavingSettings, setIsSavingSettings] = useState<boolean>(false);
+  const [session, setSession] = useState<AuthSession>({ role: "guest", isAuthenticated: false });
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [promptSeed, setPromptSeed] = useState<number>(0);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -120,22 +154,37 @@ export function useChatState(): UseChatState {
     }));
   }, []);
 
+  const loadConversations = useCallback(async () => {
+    const data = await fetchJson<{ conversations: ApiConversation[] }>(
+      "/api/conversations"
+    );
+    setChats(data.conversations);
+    const firstId = data.conversations[0]?.id ?? null;
+    setActiveChatId(firstId);
+    setMessagesByChat({});
+    if (firstId) {
+      await loadMessages(firstId);
+    }
+  }, [loadMessages]);
+
+  const loadSettings = useCallback(async () => {
+    const data = await fetchJson<{ settings: ChatSettings }>("/api/settings");
+    setSettings(data.settings);
+  }, []);
+
+  useEffect(() => {
+    if (activeChatId && !messagesByChat[activeChatId]) {
+      void loadMessages(activeChatId);
+    }
+  }, [activeChatId, loadMessages, messagesByChat]);
+
+
   useEffect(() => {
     let cancelled = false;
 
-    async function loadConversations() {
+    void (async () => {
       try {
-        const data = await fetchJson<{ conversations: ApiConversation[] }>(
-          "/api/conversations"
-        );
-        if (cancelled) return;
-
-        setChats(data.conversations);
-        const firstId = data.conversations[0]?.id ?? null;
-        setActiveChatId(firstId);
-        if (firstId) {
-          await loadMessages(firstId);
-        }
+        await loadConversations();
       } catch (error) {
         console.error("Failed to load conversations", error);
       } finally {
@@ -143,14 +192,52 @@ export function useChatState(): UseChatState {
           setIsLoadingConversations(false);
         }
       }
-    }
-
-    void loadConversations();
+    })();
 
     return () => {
       cancelled = true;
     };
-  }, [loadMessages]);
+  }, [loadConversations]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        await loadSettings();
+      } catch (error) {
+        console.error("Failed to load settings", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadSettings]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSession() {
+      try {
+        const data = await fetchJson<{ session: AuthSession }>("/api/auth/session");
+        if (cancelled) return;
+
+        setSession(data.session);
+        if (data.session.isAuthenticated) {
+          await Promise.all([loadConversations(), loadSettings()]);
+        }
+      } catch (error) {
+        console.error("Failed to load session", error);
+      }
+    }
+
+    void loadSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadConversations, loadSettings]);
 
   const selectChat = useCallback(
     (id: string) => {
@@ -199,6 +286,13 @@ export function useChatState(): UseChatState {
   const sendMessage = useCallback(
     (text: string, files: UploadedFile[]) => {
       if (isStreaming) return;
+      if (!session.isAuthenticated) {
+        setAuthError("Login diperlukan untuk mengirim pesan.");
+        window.dispatchEvent(new CustomEvent("ai-chat-login-required", {
+          detail: { text, files },
+        }));
+        return;
+      }
 
       const targetChatId = activeChatId;
       const optimisticChatId = targetChatId ?? `temp-${nextId()}`;
@@ -240,6 +334,9 @@ export function useChatState(): UseChatState {
             body: JSON.stringify({
               conversationId: targetChatId,
               message: text,
+              model: settings.defaultModel,
+              systemPrompt: settings.systemPrompt,
+              temperature: settings.temperature,
               stream: true,
             }),
             signal: controller.signal,
@@ -360,7 +457,7 @@ export function useChatState(): UseChatState {
                 {
                   id: `error-${nextId()}`,
                   role: "assistant",
-                  content: `Maaf, gagal mengirim pesan: ${(error as Error).message}`,
+                  content: `Maaf, ${(error as Error).message}`,
                 }
               ),
             }));
@@ -371,8 +468,9 @@ export function useChatState(): UseChatState {
         }
       })();
     },
-    [activeChatId, isStreaming]
+    [activeChatId, isStreaming, settings, session.isAuthenticated]
   );
+
 
   const stopStreaming = useCallback(() => {
     abortRef.current?.abort();
@@ -381,15 +479,129 @@ export function useChatState(): UseChatState {
   }, []);
 
   const copyMessage = useCallback((id: string, content: string) => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      void navigator.clipboard.writeText(content);
-    }
-    setCopiedId(id);
-    window.setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), COPY_FEEDBACK_MS);
+    void (async () => {
+      try {
+        await navigator.clipboard.writeText(content);
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+      } catch (error) {
+        console.error("Failed to copy message", error);
+      }
+    })();
   }, []);
 
   const rateMessage = useCallback((id: string, value: FeedbackValue) => {
-    setFeedback((prev) => ({ ...prev, [id]: prev[id] === value ? null : value }));
+    setFeedback((prev) => ({
+      ...prev,
+      [id]: prev[id] === value ? null : value,
+    }));
+  }, []);
+
+  const saveSettings = useCallback(async (nextSettings: ChatSettings): Promise<void> => {
+    setIsSavingSettings(true);
+    try {
+      const data = await fetchJson<{ settings: ChatSettings }>("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nextSettings),
+      });
+      setSettings(data.settings);
+    } catch (error) {
+      console.error("Failed to save settings", error);
+      throw error;
+    } finally {
+      setIsSavingSettings(false);
+    }
+  }, []);
+
+  const renameChat = useCallback((id: string, newTitle: string) => {
+    void (async () => {
+      try {
+        const data = await fetchJson<{ conversation: ApiConversation }>(
+          `/api/conversations/${id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: newTitle }),
+          }
+        );
+        setChats((prev) =>
+          prev.map((chat) => (chat.id === id ? { ...chat, title: data.conversation.title } : chat))
+        );
+      } catch (error) {
+        console.error("Failed to rename chat", error);
+      }
+    })();
+  }, []);
+
+
+  const clearChats = useCallback(() => {
+    void (async () => {
+      await fetchJson<{ ok: boolean }>("/api/conversations", { method: "DELETE" });
+      setChats([]);
+      setActiveChatId(null);
+      setPromptSeed((prev) => prev + 1);
+    })();
+  }, [loadConversations, loadSettings]);
+
+  const shareChat = useCallback(async (id: string, isShared: boolean) => {
+    if (!session.isAuthenticated) {
+      setAuthError("Login diperlukan untuk share chat.");
+      window.dispatchEvent(new CustomEvent("ai-chat-login-required"));
+      return;
+    }
+
+    const data = await fetchJson<{ conversation: ApiConversation }>(
+      `/api/conversations/${id}/share`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isShared }),
+      }
+    );
+
+    setChats((prev) => prev.map((chat) => (
+      chat.id === data.conversation.id ? { ...chat, ...data.conversation } : chat
+    )));
+
+    return data.conversation;
+  }, [session.isAuthenticated]);
+
+  const login = useCallback(async (credentials: { email: string; password: string }): Promise<AuthSession | void> => {
+    setIsAuthLoading(true);
+    setAuthError(null);
+    try {
+      const data = await fetchJson<{ session: AuthSession }>("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(credentials),
+      });
+      setSession(data.session);
+      if (data.session.isAuthenticated) {
+        await Promise.all([loadConversations(), loadSettings()]);
+      }
+      return data.session;
+    } catch (error) {
+      setAuthError((error as Error).message);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  }, [loadConversations, loadSettings]);
+
+  const logout = useCallback(() => {
+    void (async () => {
+      const data = await fetchJson<{ session: AuthSession }>("/api/auth/logout", { method: "POST" });
+      setSession(data.session);
+      setChats([]);
+      setMessagesByChat({});
+      setActiveChatId(null);
+      setPromptSeed((prev) => prev + 1);
+      void loadSettings();
+    })();
+  }, [loadSettings]);
+
+  const clearAuthError = useCallback(() => {
+    setAuthError(null);
   }, []);
 
   return {
@@ -401,12 +613,24 @@ export function useChatState(): UseChatState {
     promptSeed,
     copiedId,
     feedback,
+    settings,
+    isSavingSettings,
+    session,
+    isAuthLoading,
+    authError,
+    clearAuthError,
     selectChat,
     createChat,
     deleteChat,
+    renameChat,
     sendMessage,
     stopStreaming,
     copyMessage,
     rateMessage,
+    saveSettings,
+    clearChats,
+    shareChat,
+    login,
+    logout,
   };
 }

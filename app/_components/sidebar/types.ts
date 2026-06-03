@@ -6,6 +6,9 @@ export interface ChatItem {
   id: string;
   title: string;
   updatedAt: string;
+  isShared?: boolean;
+  shareId?: string | null;
+  sharedAt?: string | null;
 }
 
 export interface SidebarUser {
@@ -20,6 +23,9 @@ export interface SidebarProps {
   onSelect: (id: string) => void;
   onNewChat: () => void;
   onDelete: (id: string) => void;
-  user: SidebarUser;
+  onRename?: (id: string, newTitle: string) => void;
+  user: SidebarUser | null;
+  isAuthenticated: boolean;
+  onLoginClick: () => void;
   isOpen?: boolean;
 }

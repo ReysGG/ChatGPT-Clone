@@ -37,4 +37,4 @@ export const INITIAL_MESSAGES: Record<string, Message[]> = {
 };
 
 /* Default model + brand shown in the chat header. */
-export const DEFAULT_MODEL_NAME = "Gemini 2.5 Flash";
+export const DEFAULT_MODEL_NAME = "Gemini 2.5 Flash Lite";

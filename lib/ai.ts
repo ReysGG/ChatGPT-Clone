@@ -1,8 +1,8 @@
 import "server-only";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Default model per planning doc: Gemini 2.5 Flash
-export const DEFAULT_MODEL = "gemini-2.5-flash";
+// Default model for MVP: prefer the lighter free-tier model to reduce quota failures.
+export const DEFAULT_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash-lite";
 
 // Lazy singleton — building the app must not require the key to be present.
 let _genAI: GoogleGenerativeAI | null = null;

@@ -17,7 +17,7 @@ export async function GET() {
 
   // Gemini — a tiny prompt to confirm the key + model are reachable
   try {
-    const model = getModel("gemini-2.5-flash");
+    const model = getModel();
     const result = await model.generateContent("Reply with the single word: pong");
     const text = result.response.text().trim();
     checks.gemini = `ok (reply="${text.slice(0, 40)}")`;

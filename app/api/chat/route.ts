@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_MODEL, getModel } from "@/lib/ai";
+import { getFriendlyChatError } from "@/lib/chat-errors";
+import { authErrorResponse, requireUser } from "@/lib/auth";
 import {
   assertConversationOwner,
   createTitleFromMessage,
-  getOrCreateDefaultUser,
+  getChatUser,
   serializeConversation,
   serializeMessage,
 } from "@/lib/chat-db";
@@ -16,6 +18,8 @@ const ChatRequestSchema = z.object({
   conversationId: z.string().optional().nullable(),
   message: z.string().trim().min(1, "Message is required"),
   model: z.string().trim().optional(),
+  systemPrompt: z.string().trim().optional(),
+  temperature: z.number().min(0).max(2).optional(),
   stream: z.boolean().optional().default(false),
 });
 
@@ -27,8 +31,9 @@ function encodeEvent(event: string, data: unknown): Uint8Array {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await requireUser();
     const body = ChatRequestSchema.parse(await request.json());
-    const user = await getOrCreateDefaultUser();
+    const user = await getChatUser(session.userId);
 
     let conversation = body.conversationId
       ? await assertConversationOwner(body.conversationId, user.id)
@@ -64,11 +69,17 @@ export async function POST(request: NextRequest) {
       take: 24,
     });
 
-    const prompt = history
-      .map((message) => `${message.role === "user" ? "User" : "Assistant"}: ${message.content}`)
-      .join("\n\n");
+    const settings = await prisma.setting.findFirst({ where: { userId: user.id } });
+    const systemPrompt = body.systemPrompt || settings?.systemPrompt || "You are a helpful personal AI assistant.";
+    const prompt = [
+      `System: ${systemPrompt}`,
+      ...history.map((message) => `${message.role === "user" ? "User" : "Assistant"}: ${message.content}`),
+    ].join("\n\n");
 
-    const model = getModel(body.model || DEFAULT_MODEL);
+    const modelName = body.model || settings?.defaultModel || DEFAULT_MODEL;
+    const temperature = body.temperature ?? settings?.temperature ?? 0.7;
+    const model = getModel(modelName);
+    const generationConfig = { temperature };
 
     if (body.stream) {
       const stream = new ReadableStream({
@@ -83,7 +94,10 @@ export async function POST(request: NextRequest) {
               })
             );
 
-            const result = await model.generateContentStream(prompt);
+            const result = await model.generateContentStream({
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+              generationConfig,
+            });
 
             for await (const chunk of result.stream) {
               if (request.signal.aborted) break;
@@ -118,7 +132,7 @@ export async function POST(request: NextRequest) {
           } catch (error) {
             controller.enqueue(
               encodeEvent("error", {
-                error: (error as Error).message || "Failed to stream response",
+                error: getFriendlyChatError(error),
               })
             );
           } finally {
@@ -137,7 +151,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig,
+    });
     const assistantText = result.response.text().trim() || "Maaf, saya belum bisa membuat jawaban.";
 
     const assistantMessage = await prisma.message.create({
@@ -163,8 +180,16 @@ export async function POST(request: NextRequest) {
       ? error.issues[0]?.message ?? "Invalid request"
       : (error as Error).message;
 
+    if (message === "AUTH_REQUIRED") {
+      return authErrorResponse();
+    }
+
     return NextResponse.json(
-      { error: message === "CONVERSATION_NOT_FOUND" ? "Conversation not found" : message },
+      {
+        error: message === "CONVERSATION_NOT_FOUND"
+          ? "Conversation not found"
+          : getFriendlyChatError(error),
+      },
       {
         status: error instanceof z.ZodError ? 400 : message === "CONVERSATION_NOT_FOUND" ? 404 : 500,
       }

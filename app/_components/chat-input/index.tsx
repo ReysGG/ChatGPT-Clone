@@ -5,6 +5,7 @@ import { StopIcon } from "@heroicons/react/24/solid";
 import { MicrophoneIcon, PaperClipIcon } from "@heroicons/react/24/outline";
 import { ChevronDownIcon, GlobeIcon, ImageIcon, PencilLineIcon, WandSparklesIcon, Plus, AudioLines } from "lucide-react";
 import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
+import { BorderBeam } from "@/components/ui/border-beam";
 import { FileUpload } from "@/components/application/file-upload/file-upload-base";
 import type { ChatInputProps, UploadedFile } from "./types";
 
@@ -96,7 +97,14 @@ export function ChatInput({
               </div>
             ) : (
               <>
-                <div className="relative mx-auto h-16 w-full max-w-5xl overflow-visible rounded-full bg-[#1e1e1e] border border-white/5 shadow-xl">
+                <div className="relative mx-auto h-16 w-full max-w-5xl overflow-hidden rounded-full border border-white/5 bg-[#1e1e1e] shadow-xl">
+                  <BorderBeam
+                    size={120}
+                    duration={9}
+                    borderWidth={1.25}
+                    colorFrom="#a78bfa"
+                    colorTo="#f59e0b"
+                  />
                   <button
                     type="button"
                     onClick={() => setShowUploader(true)}
@@ -230,7 +238,14 @@ export function ChatInput({
             <StopButton onStop={onStop} />
           </div>
         ) : (
-          <div className="relative mx-auto h-16 w-full max-w-3xl overflow-visible rounded-full bg-[#1e1e1e] border border-white/5 shadow-md">
+          <div className="relative mx-auto h-16 w-full max-w-3xl overflow-hidden rounded-full border border-white/5 bg-[#1e1e1e] shadow-md">
+            <BorderBeam
+              size={90}
+              duration={10}
+              borderWidth={1.25}
+              colorFrom="#a78bfa"
+              colorTo="#22d3ee"
+            />
             <button
               type="button"
               onClick={() => setShowUploader(true)}

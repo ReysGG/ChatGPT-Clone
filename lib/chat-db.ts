@@ -1,8 +1,18 @@
 import "server-only";
+import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 
 export const DEFAULT_USER_EMAIL = process.env.APP_USER_EMAIL ?? "david@example.com";
 export const DEFAULT_USER_NAME = process.env.APP_USER_NAME ?? "David";
+
+export async function getChatUser(userId?: string) {
+  if (userId) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (user) return user;
+  }
+
+  return getOrCreateDefaultUser();
+}
 
 export async function getOrCreateDefaultUser() {
   return prisma.user.upsert({
@@ -13,7 +23,7 @@ export async function getOrCreateDefaultUser() {
       name: DEFAULT_USER_NAME,
       settings: {
         create: {
-          defaultModel: "gemini-2.5-flash",
+          defaultModel: process.env.GEMINI_MODEL ?? "gemini-2.5-flash-lite",
           systemPrompt: "You are a helpful personal AI assistant.",
           temperature: 0.7,
           darkMode: true,
@@ -34,12 +44,18 @@ export function serializeConversation(conversation: {
   title: string;
   updatedAt: Date;
   createdAt: Date;
+  isShared?: boolean;
+  shareId?: string | null;
+  sharedAt?: Date | null;
 }) {
   return {
     id: conversation.id,
     title: conversation.title,
     updatedAt: conversation.updatedAt.toISOString(),
     createdAt: conversation.createdAt.toISOString(),
+    isShared: Boolean(conversation.isShared),
+    shareId: conversation.shareId ?? null,
+    sharedAt: conversation.sharedAt?.toISOString() ?? null,
   };
 }
 
@@ -67,4 +83,8 @@ export async function assertConversationOwner(conversationId: string, userId: st
   }
 
   return conversation;
+}
+
+export function createShareId(): string {
+  return randomBytes(12).toString("base64url");
 }

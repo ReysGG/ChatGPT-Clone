@@ -15,6 +15,15 @@ export interface ChatPanelProps {
   feedback: Record<string, FeedbackValue | null>;
   onCopy: (id: string, content: string) => void;
   onFeedback: (id: string, value: FeedbackValue) => void;
+  onMore?: () => void;
+  sessionRole?: "guest" | "user" | "admin";
+  isAuthenticated?: boolean;
+  onLoginClick?: () => void;
+  onLogout?: () => void;
+  isShareable?: boolean;
+  isShared?: boolean;
+  shareStatus?: "idle" | "sharing" | "copied";
+  onShare?: () => void;
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
 }
@@ -30,6 +39,15 @@ export function ChatPanel({
   feedback,
   onCopy,
   onFeedback,
+  onMore,
+  sessionRole,
+  isAuthenticated,
+  onLoginClick,
+  onLogout,
+  isShareable,
+  isShared,
+  shareStatus,
+  onShare,
   isSidebarOpen,
   onToggleSidebar,
 }: ChatPanelProps): React.ReactElement {
@@ -40,6 +58,15 @@ export function ChatPanel({
         modelName={modelName}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={onToggleSidebar}
+        onMore={onMore}
+        sessionRole={sessionRole}
+        isAuthenticated={isAuthenticated}
+        onLoginClick={onLoginClick}
+        onLogout={onLogout}
+        isShareable={isShareable}
+        isShared={isShared}
+        shareStatus={shareStatus}
+        onShare={onShare}
       />
       <div className="relative flex-1 overflow-y-auto px-4 py-6">
         <MessageList

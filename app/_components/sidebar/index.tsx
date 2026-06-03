@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Bars3Icon } from "@heroicons/react/24/outline";
+import { Bars3Icon, UserCircleIcon } from "@heroicons/react/24/outline";
 import { Card, List, ListItem, Typography } from "./primitives";
 import { SIDEBAR_WIDTH_REM } from "./styles";
 import { formatRelative, useNow } from "./use-now";
@@ -22,7 +22,10 @@ export function Sidebar({
   onSelect,
   onNewChat,
   onDelete,
+  onRename,
   user,
+  isAuthenticated,
+  onLoginClick,
   isOpen = true,
 }: SidebarProps): React.ReactElement {
   const [query, setQuery] = useState<string>("");
@@ -61,12 +64,15 @@ export function Sidebar({
             activeChatId={activeChatId}
             onSelect={onSelect}
             onDelete={onDelete}
+            onRename={onRename}
             onRequestDelete={setChatToDelete}
             onNewChat={onNewChat}
             onFocusSearch={() => searchInputRef.current?.focus()}
             searchInputRef={searchInputRef}
             now={now}
             user={user}
+            isAuthenticated={isAuthenticated}
+            onLoginClick={onLoginClick}
           />
         </div>
       </aside>
@@ -90,12 +96,15 @@ export function Sidebar({
               activeChatId={activeChatId}
               onSelect={onSelect}
               onDelete={onDelete}
+              onRename={onRename}
               onRequestDelete={setChatToDelete}
               onNewChat={onNewChat}
               onFocusSearch={() => searchInputRef.current?.focus()}
               searchInputRef={searchInputRef}
               now={now}
               user={user}
+              isAuthenticated={isAuthenticated}
+              onLoginClick={onLoginClick}
               onCloseDrawer={() => setDrawerOpen(false)}
             />
           </div>
@@ -127,12 +136,15 @@ interface SidebarBodyProps {
   activeChatId: string | null;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
+  onRename?: (id: string, newTitle: string) => void;
   onRequestDelete: (chat: ChatItem) => void;
   onNewChat: () => void;
   onFocusSearch: () => void;
   searchInputRef: React.RefObject<HTMLInputElement | null>;
   now: number | null;
   user: SidebarProps["user"];
+  isAuthenticated: boolean;
+  onLoginClick: () => void;
   onCloseDrawer?: () => void;
 }
 
@@ -143,19 +155,25 @@ function SidebarBody({
   activeChatId,
   onSelect,
   onDelete,
+  onRename,
   onRequestDelete,
   onNewChat,
   onFocusSearch,
   searchInputRef,
   now,
   user,
+  isAuthenticated,
+  onLoginClick,
   onCloseDrawer,
 }: SidebarBodyProps): React.ReactElement {
   return (
     <Card className="flex h-full w-full max-w-[18rem] flex-col !bg-sidebar !text-white shadow-xl shadow-black/30 rounded-none border-r border-white/[0.06] overflow-hidden">
       <SidebarHeader onClose={onCloseDrawer ?? (() => undefined)} />
 
-      <SidebarNav onNewChat={onNewChat} onFocusSearch={onFocusSearch} />
+      <SidebarNav
+        onNewChat={isAuthenticated ? onNewChat : onLoginClick}
+        onFocusSearch={isAuthenticated ? onFocusSearch : onLoginClick}
+      />
 
       <div className="sr-only">
         <ChatSearch ref={searchInputRef} value={query} onChange={onQueryChange} />
@@ -172,7 +190,16 @@ function SidebarBody({
 
       <div className="mt-1 min-h-0 flex-1 overflow-y-auto px-3">
         <List className="!mt-0 !gap-0 !p-0">
-          {filtered.length === 0 ? (
+          {!isAuthenticated ? (
+            <ListItem
+              disabled
+              asDiv
+              className="!items-start !text-muted hover:!bg-transparent"
+            >
+              <UserCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
+              <span>Login untuk melihat chat pribadi.</span>
+            </ListItem>
+          ) : filtered.length === 0 ? (
             <ListItem
               disabled
               asDiv
@@ -187,8 +214,10 @@ function SidebarBody({
                 active={c.id === activeChatId}
                 title={c.title}
                 relative={now == null ? "—" : formatRelative(c.updatedAt, now)}
+                isShared={c.isShared}
                 onClick={() => onSelect(c.id)}
                 onDelete={() => onRequestDelete(c)}
+                onRename={onRename ? (newTitle) => onRename(c.id, newTitle) : undefined}
               />
             ))
           )}
@@ -196,7 +225,21 @@ function SidebarBody({
       </div>
 
       <div className="px-4 pb-4 pt-3">
-        <UserMenu user={user} onUpgrade={() => undefined} />
+        {isAuthenticated && user ? (
+          <UserMenu user={user} onUpgrade={() => undefined} />
+        ) : (
+          <button
+            type="button"
+            onClick={onLoginClick}
+            className="flex w-full items-center gap-2.5 rounded-lg border border-white/[0.08] px-3 py-2 text-left text-sm text-white transition hover:bg-white/[0.06]"
+          >
+            <UserCircleIcon className="h-5 w-5 text-muted" />
+            <span className="min-w-0 flex-1">
+              <span className="block font-medium">Guest</span>
+              <span className="block truncate text-xs text-muted">Login atau daftar</span>
+            </span>
+          </button>
+        )}
       </div>
     </Card>
   );
