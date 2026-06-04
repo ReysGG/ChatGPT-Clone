@@ -100,17 +100,22 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ settings: serializeSettings(settings) });
   } catch (error) {
-    const message = error instanceof z.ZodError
-      ? error.issues[0]?.message ?? "Invalid settings"
-      : (error as Error).message;
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: error.issues[0]?.message ?? "Invalid settings" },
+        { status: 400 }
+      );
+    }
 
+    const message = (error as Error).message;
     if (message === "AUTH_REQUIRED") {
       return authErrorResponse("Login diperlukan untuk mengubah settings.");
     }
 
+    console.error("[PUT /api/settings]", error);
     return NextResponse.json(
-      { error: message },
-      { status: error instanceof z.ZodError ? 400 : 500 }
+      { error: "Gagal menyimpan settings. Coba lagi." },
+      { status: 500 }
     );
   }
 }

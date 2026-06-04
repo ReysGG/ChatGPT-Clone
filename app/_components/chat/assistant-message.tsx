@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { SparklesIcon } from "@heroicons/react/24/outline";
 import { CopyButton } from "./copy-button";
 import { FeedbackButton } from "./feedback-button";
@@ -19,7 +20,7 @@ interface AssistantMessageProps {
   onFeedback: (id: string, value: FeedbackValue) => void;
 }
 
-export function AssistantMessage({
+export const AssistantMessage = memo(function AssistantMessage({
   message,
   isStreaming,
   copiedId,
@@ -63,4 +64,6 @@ export function AssistantMessage({
       </div>
     </li>
   );
-}
+});
+
+AssistantMessage.displayName = "AssistantMessage";

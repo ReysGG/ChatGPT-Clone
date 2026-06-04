@@ -19,6 +19,11 @@ const DEFAULT_SETTINGS: ChatSettings = {
 type ApiConversation = ChatItem & { createdAt?: string };
 type ApiMessage = Omit<Message, "role"> & { role: string };
 
+type ConversationsResponse = {
+  conversations: ApiConversation[];
+  nextCursor: string | null;
+};
+
 type StreamMeta = {
   conversation: ApiConversation;
   userMessage: ApiMessage;
@@ -104,6 +109,8 @@ export interface UseChatState {
   session: AuthSession;
   isAuthLoading: boolean;
   authError: string | null;
+  hasMoreConversations: boolean;
+  isLoadingMoreConversations: boolean;
   clearAuthError: () => void;
   selectChat: (id: string) => void;
   createChat: () => void;
@@ -118,6 +125,7 @@ export interface UseChatState {
   shareChat: (id: string, isShared: boolean) => Promise<ChatItem | void>;
   updateTags: (id: string, tagNames: string[]) => Promise<void>;
   searchConversations: (query: string) => Promise<void>;
+  loadMoreConversations: () => Promise<void>;
   login: (credentials: { email: string; password: string }) => Promise<AuthSession | void>;
   logout: () => void;
 }
@@ -145,6 +153,9 @@ export function useChatState(): UseChatState {
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [promptSeed, setPromptSeed] = useState<number>(0);
+  const [conversationsCursor, setConversationsCursor] = useState<string | null>(null);
+  const [hasMoreConversations, setHasMoreConversations] = useState<boolean>(false);
+  const [isLoadingMoreConversations, setIsLoadingMoreConversations] = useState<boolean>(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const activeMessages = activeChatId ? messagesByChat[activeChatId] ?? [] : [];
@@ -160,10 +171,12 @@ export function useChatState(): UseChatState {
   }, []);
 
   const loadConversations = useCallback(async () => {
-    const data = await fetchJson<{ conversations: ApiConversation[] }>(
+    const data = await fetchJson<ConversationsResponse>(
       "/api/conversations"
     );
     setChats(data.conversations);
+    setConversationsCursor(data.nextCursor);
+    setHasMoreConversations(data.nextCursor !== null);
     const firstId = data.conversations[0]?.id ?? null;
     setActiveChatId(firstId);
     setMessagesByChat({});
@@ -171,6 +184,27 @@ export function useChatState(): UseChatState {
       await loadMessages(firstId);
     }
   }, [loadMessages]);
+
+  const loadMoreConversations = useCallback(async () => {
+    if (!conversationsCursor || isLoadingMoreConversations) return;
+    setIsLoadingMoreConversations(true);
+    try {
+      const data = await fetchJson<ConversationsResponse>(
+        `/api/conversations?cursor=${encodeURIComponent(conversationsCursor)}`
+      );
+      setChats((prev) => {
+        const existingIds = new Set(prev.map((c) => c.id));
+        const newChats = data.conversations.filter((c) => !existingIds.has(c.id));
+        return [...prev, ...newChats];
+      });
+      setConversationsCursor(data.nextCursor);
+      setHasMoreConversations(data.nextCursor !== null);
+    } catch (error) {
+      console.error("Failed to load more conversations", error);
+    } finally {
+      setIsLoadingMoreConversations(false);
+    }
+  }, [conversationsCursor, isLoadingMoreConversations]);
 
   const loadSettings = useCallback(async () => {
     const data = await fetchJson<{ settings: ChatSettings }>("/api/settings");
@@ -712,6 +746,9 @@ export function useChatState(): UseChatState {
     shareChat,
     updateTags,
     searchConversations,
+    loadMoreConversations,
+    hasMoreConversations,
+    isLoadingMoreConversations,
     login,
     logout,
   };

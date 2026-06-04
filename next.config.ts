@@ -19,6 +19,24 @@ const securityHeaders = [
     key: "Strict-Transport-Security",
     value: "max-age=31536000; includeSubDomains",
   },
+  // Content-Security-Policy — defense-in-depth against XSS.
+  // unsafe-inline is required for Next.js style injection and Tailwind.
+  // unsafe-eval is intentionally blocked.
+  {
+    key: "Content-Security-Policy",
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data:",
+      // SSE / streaming endpoint on same origin
+      "connect-src 'self' https://generativelanguage.googleapis.com",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join("; "),
+  },
 ];
 
 const nextConfig: NextConfig = {

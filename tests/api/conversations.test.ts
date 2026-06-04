@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { NextRequest } from "next/server";
 
 // Mock server-only
 vi.mock("server-only", () => ({}));
@@ -52,10 +53,11 @@ describe("Conversations API", () => {
   describe("GET /api/conversations", () => {
     it("should return empty list if user is guest / not authenticated", async () => {
       mockGetSession.mockResolvedValue({ isAuthenticated: false, role: "guest" });
-      const response = await GET();
+      const request = new Request("http://localhost:3000/api/conversations") as NextRequest;
+      const response = await GET(request as NextRequest);
       const body = await response.json();
       expect(response.status).toBe(200);
-      expect(body).toEqual({ conversations: [] });
+      expect(body).toEqual({ conversations: [], nextCursor: null });
     });
 
     it("should return list of conversations for authenticated user", async () => {
@@ -65,11 +67,13 @@ describe("Conversations API", () => {
         { id: "conv-2", title: "Chat 2", userId: "user-123" },
       ]);
 
-      const response = await GET();
+      const request = new Request("http://localhost:3000/api/conversations") as NextRequest;
+      const response = await GET(request as NextRequest);
       const body = await response.json();
       expect(response.status).toBe(200);
       expect(body.conversations).toHaveLength(2);
       expect(body.conversations[0].id).toBe("conv-1");
+      expect(body.nextCursor).toBeNull();
     });
   });
 

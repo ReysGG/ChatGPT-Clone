@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { PaperClipIcon, CheckIcon } from "@heroicons/react/24/outline";
 import type { Message } from "./types";
 import { formatClockTime } from "./format";
@@ -11,7 +12,7 @@ interface UserMessageProps {
   message: Message;
 }
 
-export function UserMessage({ message }: UserMessageProps): React.ReactElement {
+export const UserMessage = memo(function UserMessage({ message }: UserMessageProps): React.ReactElement {
   return (
     <li className="flex justify-end">
       <div className="max-w-[80%]">
@@ -40,4 +41,6 @@ export function UserMessage({ message }: UserMessageProps): React.ReactElement {
       </div>
     </li>
   );
-}
+});
+
+UserMessage.displayName = "UserMessage";

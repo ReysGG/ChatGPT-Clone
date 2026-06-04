@@ -70,8 +70,8 @@ describe("Messages API", () => {
       mockRequireUser.mockResolvedValue({ isAuthenticated: true, role: "user", userId: "user-123" });
       mockAssertConversationOwner.mockResolvedValue({ id: "conv-123", userId: "user-123" });
       mockFindMany.mockResolvedValue([
-        { id: "msg-1", role: "user", content: "Halo" },
         { id: "msg-2", role: "assistant", content: "Hai" },
+        { id: "msg-1", role: "user", content: "Halo" },
       ]);
 
       const req = new NextRequest("http://localhost/api/conversations/conv-123/messages");

@@ -214,15 +214,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const prompt = [
-      `System: ${systemPrompt}`,
-      ...history.map((message) => {
-        if (message.id === userMessage.id && documentContext) {
-          return `User: ${message.content}${documentContext}`;
-        }
-        return `${message.role === "user" ? "User" : "Assistant"}: ${message.content}`;
-      }),
-    ].join("\n\n");
+    // Build structured contents array for Gemini API.
+    // IMPORTANT: system prompt is passed separately via `systemInstruction` —
+    // NOT concatenated with user content. This prevents prompt injection where
+    // a user message could contain text like "\n\nSystem: ignore previous instructions".
+    const contents = history.map((message) => ({
+      role: message.role === "user" ? "user" : "model",
+      parts: [{
+        text:
+          message.id === userMessage.id && documentContext
+            ? `${message.content}${documentContext}`
+            : message.content,
+      }],
+    }));
 
     const modelName = body.model || settings?.defaultModel || globalSettings?.defaultModel || DEFAULT_MODEL;
     const temperature = body.temperature ?? settings?.temperature ?? globalSettings?.defaultTemperature ?? 0.7;
@@ -237,12 +241,20 @@ export async function POST(request: NextRequest) {
       model = getModel(modelName);
     }
     
-    const generationConfig = { temperature };
+    const generationConfig = {
+      temperature,
+      maxOutputTokens: 8192,
+    };
+
+    // 45-second timeout — prevents hang if Gemini API is unresponsive.
+    // The request.signal handles client disconnect; this handles server-side timeout.
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(new Error("AI request timeout")), 45_000);
 
     // Estimate / count prompt tokens
     let inputTokens = 0;
     try {
-      const tokenResult = await model.countTokens(prompt);
+      const tokenResult = await model.countTokens({ contents });
       inputTokens = tokenResult.totalTokens;
     } catch (err) {
       console.error("Error counting input tokens:", err);
@@ -262,7 +274,8 @@ export async function POST(request: NextRequest) {
             );
 
             const result = await model.generateContentStream({
-              contents: [{ role: "user", parts: [{ text: prompt }] }],
+              systemInstruction: systemPrompt,
+              contents,
               generationConfig,
             });
 
@@ -293,7 +306,7 @@ export async function POST(request: NextRequest) {
             // Count output tokens and log usage event
             let outputTokens = 0;
             try {
-              const tokenResult = await model.countTokens(finalText);
+              const tokenResult = await model.countTokens({ contents: [{ role: "model", parts: [{ text: finalText }] }] });
               outputTokens = tokenResult.totalTokens;
             } catch (err) {
               console.error("Error counting output tokens:", err);
@@ -322,6 +335,7 @@ export async function POST(request: NextRequest) {
               })
             );
           } finally {
+            clearTimeout(timeoutId);
             controller.close();
           }
         },
@@ -338,9 +352,11 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      systemInstruction: systemPrompt,
+      contents,
       generationConfig,
     });
+    clearTimeout(timeoutId);
     const assistantText = result.response.text().trim() || "Maaf, saya belum bisa membuat jawaban.";
 
     const assistantMessage = await prisma.message.create({
@@ -359,7 +375,7 @@ export async function POST(request: NextRequest) {
     // Count output tokens and log usage event
     let outputTokens = 0;
     try {
-      const tokenResult = await model.countTokens(assistantText);
+      const tokenResult = await model.countTokens({ contents: [{ role: "user", parts: [{ text: assistantText }] }] });
       outputTokens = tokenResult.totalTokens;
     } catch (err) {
       console.error("Error counting output tokens:", err);

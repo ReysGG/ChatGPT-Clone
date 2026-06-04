@@ -87,6 +87,7 @@ model Conversation {
   updatedAt DateTime  @updatedAt
 
   @@index([userId])
+  @@index([userId, updatedAt(sort: Desc)])
 }
 
 model Message {
