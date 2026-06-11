@@ -270,7 +270,7 @@ function SidebarBody({
   };
 
   return (
-    <Card className="flex h-full w-full max-w-[18rem] flex-col !bg-sidebar !text-white shadow-xl shadow-black/30 rounded-none border-r border-white/[0.06] overflow-hidden">
+    <Card className="flex h-full w-full max-w-[18rem] flex-col bg-sidebar text-foreground rounded-none border-r border-border overflow-hidden">
       <SidebarHeader onClose={onCloseDrawer ?? (() => undefined)} />
 
       <SidebarNav
@@ -292,8 +292,8 @@ function SidebarBody({
                     onClick={() => onSelectTag(isSelected ? null : tag)}
                     className={`inline-block text-[10px] px-2 py-0.5 rounded transition font-medium ${
                       isSelected
-                        ? "bg-violet-500 text-white shadow-sm"
-                        : "bg-white/[0.04] text-muted hover:bg-white/[0.08] hover:text-white"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "bg-muted/20 text-muted-foreground hover:bg-muted/30 hover:text-foreground"
                     }`}
                   >
                     {tag}
@@ -308,7 +308,7 @@ function SidebarBody({
       <div className="mt-4 px-5">
         <Typography
           variant="small"
-          className="!text-white/90 !text-[13px] !font-semibold"
+          className="text-foreground/90 !text-[13px] !font-semibold"
         >
           Recents
         </Typography>
@@ -323,19 +323,19 @@ function SidebarBody({
             <ListItem
               disabled
               asDiv
-              className="!items-start !text-muted hover:!bg-transparent"
+              className="!items-start !text-muted-foreground hover:!bg-transparent"
             >
-              <UserCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
+              <UserCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <span>Login untuk melihat chat pribadi.</span>
             </ListItem>
           ) : isLoading ? (
             <div className="space-y-3.5 px-3 py-2.5 animate-pulse">
               {[1, 2, 3, 4].map((i) => (
                 <div key={i} className="flex items-center gap-3">
-                  <div className="size-4 rounded bg-white/10 shrink-0" />
+                  <div className="size-4 rounded bg-muted/20 shrink-0" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-3 w-10/12 rounded bg-white/10" />
-                    <div className="h-2 w-5/12 rounded bg-white/5" />
+                    <div className="h-3 w-10/12 rounded bg-muted/20" />
+                    <div className="h-2 w-5/12 rounded bg-muted/10" />
                   </div>
                 </div>
               ))}
@@ -344,7 +344,7 @@ function SidebarBody({
             <ListItem
               disabled
               asDiv
-              className="!text-muted hover:!bg-transparent"
+              className="!text-muted-foreground hover:!bg-transparent"
             >
               {query ? EMPTY_LABEL_QUERY : EMPTY_LABEL_NONE}
             </ListItem>
@@ -373,12 +373,12 @@ function SidebarBody({
           <button
             type="button"
             onClick={handleLoginClick}
-            className="flex w-full items-center gap-2.5 rounded-lg border border-white/[0.08] px-3 py-2 text-left text-sm text-white transition hover:bg-white/[0.06]"
+            className="flex w-full items-center gap-2.5 rounded-lg border border-border px-3 py-2 text-left text-sm text-foreground transition hover:bg-muted/10"
           >
-            <UserCircleIcon className="h-5 w-5 text-muted" />
+            <UserCircleIcon className="h-5 w-5 text-muted-foreground" />
             <span className="min-w-0 flex-1">
               <span className="block font-medium">Guest</span>
-              <span className="block truncate text-xs text-muted">Login atau daftar</span>
+              <span className="block truncate text-xs text-muted-foreground">Login atau daftar</span>
             </span>
           </button>
         )}

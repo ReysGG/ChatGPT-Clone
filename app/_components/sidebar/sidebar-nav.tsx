@@ -28,34 +28,34 @@ export function SidebarNav({
     {
       key: "new-chat",
       label: "New chat",
-      icon: <PencilSquareIcon className="h-5 w-5 text-white/80" />,
+      icon: <PencilSquareIcon className="h-5 w-5 text-foreground/75" />,
       onClick: onNewChat,
     },
     {
       key: "search",
       label: "Search chats",
-      icon: <MagnifyingGlassIcon className="h-5 w-5 text-white/80" />,
+      icon: <MagnifyingGlassIcon className="h-5 w-5 text-foreground/75" />,
       onClick: onFocusSearch,
     },
     {
       key: "library",
       label: "Library",
-      icon: <RectangleGroupIcon className="h-5 w-5 text-white/80" />,
+      icon: <RectangleGroupIcon className="h-5 w-5 text-foreground/75" />,
     },
     {
       key: "projects",
       label: "Projects",
-      icon: <FolderPlusIcon className="h-5 w-5 text-white/80" />,
+      icon: <FolderPlusIcon className="h-5 w-5 text-foreground/75" />,
     },
     {
       key: "apps",
       label: "Apps",
-      icon: <Squares2X2Icon className="h-5 w-5 text-white/80" />,
+      icon: <Squares2X2Icon className="h-5 w-5 text-foreground/75" />,
     },
     {
       key: "more",
       label: "More",
-      icon: <EllipsisHorizontalIcon className="h-5 w-5 text-white/80" />,
+      icon: <EllipsisHorizontalIcon className="h-5 w-5 text-foreground/75" />,
     },
   ];
 
@@ -63,7 +63,7 @@ export function SidebarNav({
     <div className="px-3 pt-2">
       <List className="!mt-0 !gap-0 !p-0">
         {links.map((link) => (
-          <ListItem key={link.key} onClick={link.onClick} className="!text-white/90">
+          <ListItem key={link.key} onClick={link.onClick} className="text-foreground/90">
             <ListItemPrefix>{link.icon}</ListItemPrefix>
             {link.label}
           </ListItem>

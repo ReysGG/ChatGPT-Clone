@@ -6,7 +6,7 @@ export function BrandLogo(): React.ReactElement {
   return (
     <div
       className={cn(
-        "grid h-9 w-9 shrink-0 place-items-center rounded-full text-white shadow-lg shadow-violet-500/30",
+        "grid h-9 w-9 shrink-0 place-items-center rounded-full text-white shadow-md shadow-primary/20",
         PURPLE_GRAD
       )}
       aria-hidden

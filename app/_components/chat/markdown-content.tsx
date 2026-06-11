@@ -31,7 +31,7 @@ export function MarkdownContent({ content }: MarkdownContentProps): React.ReactE
             href={href}
             target="_blank"
             rel="noreferrer noopener"
-            className="text-violet-300 underline decoration-violet-300/40 underline-offset-2 hover:text-violet-200"
+            className="text-primary underline decoration-primary/40 underline-offset-2 hover:text-primary/80"
           >
             {children}
           </a>
@@ -41,7 +41,7 @@ export function MarkdownContent({ content }: MarkdownContentProps): React.ReactE
           if (!isBlock) {
             return (
               <code
-                className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-violet-100"
+                className="rounded bg-muted/30 px-1.5 py-0.5 font-mono text-[0.9em] text-foreground border border-border/50"
                 {...props}
               >
                 {children}
@@ -56,14 +56,14 @@ export function MarkdownContent({ content }: MarkdownContentProps): React.ReactE
           );
         },
         pre: ({ children }) => (
-          <pre className="my-3 overflow-x-auto rounded-xl border border-white/10 bg-black/60 p-3 text-sm leading-relaxed">
+          <pre className="my-3 overflow-x-auto rounded-xl border border-border bg-muted/20 p-3 text-sm leading-relaxed text-foreground">
             {children}
           </pre>
         ),
         ul: ({ children }) => <ul className="my-2 list-disc space-y-1 pl-5">{children}</ul>,
         ol: ({ children }) => <ol className="my-2 list-decimal space-y-1 pl-5">{children}</ol>,
         blockquote: ({ children }) => (
-          <blockquote className="my-3 border-l-2 border-violet-400/50 pl-3 text-white/80">
+          <blockquote className="my-3 border-l-2 border-primary/40 pl-3 text-muted-foreground">
             {children}
           </blockquote>
         ),
@@ -73,9 +73,9 @@ export function MarkdownContent({ content }: MarkdownContentProps): React.ReactE
           </div>
         ),
         th: ({ children }) => (
-          <th className="border border-white/10 bg-white/5 px-2 py-1 font-semibold">{children}</th>
+          <th className="border border-border bg-muted/30 px-2 py-1 font-semibold text-foreground">{children}</th>
         ),
-        td: ({ children }) => <td className="border border-white/10 px-2 py-1">{children}</td>,
+        td: ({ children }) => <td className="border border-border px-2 py-1 text-foreground">{children}</td>,
         p: ({ children }) => <p className="my-2 first:mt-0 last:mb-0">{children}</p>,
       }}
     >

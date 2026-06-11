@@ -35,8 +35,8 @@ export function ChatRow({
   }, [title]);
 
   const state = active
-    ? "bg-violet-500/15 ring-1 ring-violet-500/30 text-white"
-    : "text-white/85 hover:bg-white/[0.04] focus:bg-white/[0.04]";
+    ? "bg-primary/10 border border-primary/20 text-primary font-medium"
+    : "text-foreground/80 hover:bg-muted/10 focus:bg-muted/10";
 
   function handleSave() {
     setIsEditing(false);
@@ -92,7 +92,7 @@ export function ChatRow({
               setEditTitle(title);
             }
           }}
-          className="min-w-0 flex-1 bg-black/40 border border-white/10 rounded px-1.5 py-0.5 text-sm text-white outline-none focus:border-violet-500"
+          className="min-w-0 flex-1 bg-card border border-border rounded px-1.5 py-0.5 text-sm text-foreground outline-none focus:border-primary"
           autoFocus
           onClick={(e) => e.stopPropagation()}
         />
@@ -104,7 +104,7 @@ export function ChatRow({
               {tags.map((tag) => (
                 <span
                   key={tag.id}
-                  className="inline-block bg-violet-500/10 text-violet-300 ring-1 ring-violet-500/20 text-[10px] px-1 py-0.2 rounded font-medium truncate max-w-[80px]"
+                  className="inline-block bg-primary/10 text-primary ring-1 ring-primary/20 text-[10px] px-1 py-0.2 rounded font-medium truncate max-w-[80px]"
                   title={tag.name}
                 >
                   {tag.name}
@@ -141,7 +141,7 @@ export function ChatRow({
                   }}
                   aria-label={`Rename chat ${title}`}
                   title="Rename chat"
-                  className="rounded p-1 text-muted transition hover:bg-white/10 hover:text-white"
+                  className="rounded p-1 text-muted-foreground transition hover:bg-muted/15 hover:text-foreground"
                 >
                   <PencilIcon className="h-3.5 w-3.5" />
                 </button>
@@ -155,7 +155,7 @@ export function ChatRow({
                 }}
                 aria-label={`Delete chat ${title}`}
                 title="Delete chat"
-                className="rounded p-1 text-muted transition hover:bg-white/10 hover:text-white"
+                className="rounded p-1 text-muted-foreground transition hover:bg-muted/15 hover:text-foreground"
               >
                 <TrashIcon className="h-3.5 w-3.5" />
               </button>

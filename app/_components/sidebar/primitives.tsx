@@ -77,8 +77,8 @@ export function ListItem({
   const base =
     "flex w-full min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition outline-none select-none";
   const state = selected
-    ? "bg-violet-500/15 ring-1 ring-violet-500/30 text-white"
-    : "text-white/85 hover:bg-white/[0.04] focus:bg-white/[0.04]";
+    ? "bg-primary/10 border border-primary/20 text-primary font-medium"
+    : "text-foreground/80 hover:bg-muted/10 focus:bg-muted/10";
   const cls = cn(base, state, className);
 
   if (asDiv) {

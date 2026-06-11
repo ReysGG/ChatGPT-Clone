@@ -6,11 +6,6 @@ import { MarkdownContent } from "./markdown-content";
 import type { FeedbackValue, Message } from "./types";
 import { formatClockTime } from "./format";
 
-const ASSISTANT_AVATAR_STYLE = {
-  background:
-    "linear-gradient(135deg, rgba(124, 58, 237, 0.25) 0%, rgba(79, 70, 229, 0.15) 100%)",
-} as const;
-
 interface AssistantMessageProps {
   message: Message;
   isStreaming: boolean;
@@ -31,19 +26,18 @@ export const AssistantMessage = memo(function AssistantMessage({
   return (
     <li className="flex gap-3">
       <div
-        className="grid size-8 shrink-0 place-items-center rounded-full text-violet-200 ring-1 ring-violet-500/20"
-        style={ASSISTANT_AVATAR_STYLE}
+        className="grid size-8 shrink-0 place-items-center rounded-full text-primary bg-primary/10 border border-primary/20"
         aria-hidden
       >
-        <SparklesIcon className="size-4 text-violet-300" />
+        <SparklesIcon className="size-4 text-primary" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="rounded-2xl rounded-tl-md border border-white/[0.06] bg-card px-4 py-2.5 text-sm leading-relaxed text-white">
+        <div className="rounded-2xl rounded-tl-md border border-border bg-card px-4 py-2.5 text-sm leading-relaxed text-foreground shadow-sm">
           {message.content ? <MarkdownContent content={message.content} /> : isStreaming ? "…" : ""}
         </div>
         <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted">
           <span>{message.createdAt ?? formatClockTime()}</span>
-          <span className="text-white/15">·</span>
+          <span className="text-border">·</span>
           <CopyButton
             copied={copiedId === message.id}
             onClick={() => onCopy(message.id, message.content)}

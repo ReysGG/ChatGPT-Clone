@@ -29,13 +29,13 @@ export function ChatHeader({
       : "Share chat";
 
   return (
-    <header className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-5 py-3.5 pl-14 md:pl-5">
+    <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-3.5 pl-14 md:pl-5">
       <div className="flex items-center gap-3 min-w-0">
         {onToggleSidebar && (
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="hidden md:grid size-8 place-items-center rounded-md text-muted transition hover:bg-white/[0.06] hover:text-white"
+            className="hidden md:grid size-8 place-items-center rounded-md text-muted-foreground transition hover:bg-muted/15 hover:text-foreground"
             aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
             title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
           >
@@ -48,7 +48,7 @@ export function ChatHeader({
         )}
         <div className="min-w-0">
           <div className="flex items-center gap-2 min-w-0">
-            <h1 className="truncate text-[15px] font-semibold tracking-tight text-white">
+            <h1 className="truncate text-[15px] font-semibold tracking-tight text-foreground">
               {title}
             </h1>
             {isShared && (
@@ -60,7 +60,7 @@ export function ChatHeader({
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
             <div className="flex items-center gap-1.5">
-              <SparklesIcon className="h-3.5 w-3.5 text-violet-400" />
+              <SparklesIcon className="h-3.5 w-3.5 text-primary" />
               <span>{modelName}</span>
             </div>
             {isAuthenticated && onUpdateTags && (
@@ -74,14 +74,14 @@ export function ChatHeader({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <span className="hidden rounded-full border border-white/[0.08] px-2.5 py-1 text-xs capitalize text-muted sm:inline-flex">
+        <span className="hidden rounded-full border border-border px-2.5 py-1 text-xs capitalize text-muted-foreground sm:inline-flex">
           {sessionRole}
         </span>
         {isAuthenticated ? (
           <button
             type="button"
             onClick={onLogout}
-            className="rounded-md border border-white/[0.08] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/[0.06]"
+            className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted/15"
           >
             Logout
           </button>
@@ -89,7 +89,7 @@ export function ChatHeader({
           <button
             type="button"
             onClick={onLoginClick}
-            className="rounded-md bg-white px-3 py-1.5 text-xs font-medium text-black transition hover:bg-white/90"
+            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:bg-primary/95"
           >
             Login
           </button>
@@ -100,7 +100,7 @@ export function ChatHeader({
           title={shareLabel}
           onClick={onShare}
           disabled={!isShareable || shareStatus === "sharing"}
-          className="grid size-8 place-items-center rounded-md text-muted transition hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+          className="grid size-8 place-items-center rounded-md text-muted-foreground transition hover:bg-muted/15 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ShareIcon className="size-[18px]" />
         </button>
@@ -109,7 +109,7 @@ export function ChatHeader({
           aria-label="Pin chat"
           title="Pin chat"
           onClick={onPin}
-          className="grid size-8 place-items-center rounded-md text-muted transition hover:bg-white/[0.06] hover:text-white"
+          className="grid size-8 place-items-center rounded-md text-muted-foreground transition hover:bg-muted/15 hover:text-foreground"
         >
           <BookmarkIcon className="size-[18px]" />
         </button>
@@ -118,7 +118,7 @@ export function ChatHeader({
           aria-label="More options"
           title="More options"
           onClick={onMore}
-          className="grid size-8 place-items-center rounded-md text-muted transition hover:bg-white/[0.06] hover:text-white"
+          className="grid size-8 place-items-center rounded-md text-muted-foreground transition hover:bg-muted/15 hover:text-foreground"
         >
           <EllipsisHorizontalIcon className="size-5" />
         </button>

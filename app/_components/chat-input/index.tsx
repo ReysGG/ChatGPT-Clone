@@ -180,11 +180,11 @@ export function ChatInput({
           )}
           <div className="pointer-events-auto w-full max-w-6xl translate-y-4">
             {showUploader ? (
-              <div className="flex w-full items-end gap-2 rounded-[28px] border border-white/10 bg-[#1f1f1f] p-2 shadow-2xl shadow-black/30">
+              <div className="flex w-full items-end gap-2 rounded-[28px] border border-border bg-card p-2 shadow-md shadow-black/5">
                 <button
                   type="button"
                   onClick={() => setShowUploader(false)}
-                  className="grid size-10 shrink-0 place-items-center rounded-full text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                  className="grid size-10 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-muted/15 hover:text-foreground"
                   aria-label="Close file uploader"
                   title="Close file uploader"
                 >
@@ -201,7 +201,7 @@ export function ChatInput({
                   type="button"
                   onClick={() => handleSend()}
                   disabled={!canSend}
-                  className="grid size-10 shrink-0 place-items-center rounded-full bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-muted"
+                  className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition hover:bg-primary/95 disabled:cursor-not-allowed disabled:bg-muted/10 disabled:text-muted-foreground dark:bg-white dark:text-black"
                   aria-label="Send"
                   title="Send"
                 >
@@ -210,7 +210,7 @@ export function ChatInput({
               </div>
             ) : (
               <>
-                <div className="relative mx-auto h-16 w-full max-w-5xl overflow-hidden rounded-full border border-white/5 bg-[#1e1e1e] shadow-xl">
+                <div className="relative mx-auto h-16 w-full max-w-5xl overflow-hidden rounded-full border border-border bg-card shadow-sm">
                   <BorderBeam
                     size={120}
                     duration={9}
@@ -221,7 +221,7 @@ export function ChatInput({
                   <button
                     type="button"
                     onClick={() => setShowUploader(true)}
-                    className="absolute left-4 top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full text-zinc-400 transition hover:text-white"
+                    className="absolute left-4 top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:text-foreground hover:bg-muted/10"
                     title="Attach files"
                     aria-label="Attach files"
                   >
@@ -245,8 +245,8 @@ export function ChatInput({
                     onClick={() => setWebSearch((prev) => !prev)}
                     className={`absolute right-[240px] top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full transition ${
                       webSearch
-                        ? "bg-violet-500/20 text-violet-400 hover:text-violet-300"
-                        : "text-zinc-400 hover:text-white"
+                        ? "bg-primary/20 text-primary hover:text-primary/90"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/10"
                     }`}
                     aria-label="Web Search"
                     title={webSearch ? "Web Search (Aktif)" : "Web Search (Nonaktif)"}
@@ -256,7 +256,7 @@ export function ChatInput({
                   <button
                     type="button"
                     onClick={() => setIsLibraryOpen(true)}
-                    className="absolute right-[108px] top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full text-zinc-400 transition hover:text-white"
+                    className="absolute right-[108px] top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:text-foreground hover:bg-muted/10"
                     aria-label="Prompt Library"
                     title="Prompt Library"
                   >
@@ -264,14 +264,14 @@ export function ChatInput({
                   </button>
                   <button
                     type="button"
-                    className="absolute right-[152px] top-1/2 z-[60] inline-flex -translate-y-1/2 items-center gap-1 rounded-full px-2 py-1 text-sm text-zinc-400 transition hover:text-white"
+                    className="absolute right-[152px] top-1/2 z-[60] inline-flex -translate-y-1/2 items-center gap-1 rounded-full px-2 py-1 text-sm text-muted-foreground transition hover:text-foreground hover:bg-muted/10"
                   >
                     Extended
                     <ChevronDownIcon className="size-3.5" />
                   </button>
                   <button
                     type="button"
-                    className="absolute right-[64px] top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full text-zinc-400 transition hover:text-white"
+                    className="absolute right-[64px] top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:text-foreground hover:bg-muted/10"
                     aria-label="Voice input"
                     title="Voice input"
                   >
@@ -280,14 +280,14 @@ export function ChatInput({
                   <button
                     type="button"
                     onClick={() => handleSend()}
-                    className="absolute right-2 top-1/2 z-[60] grid size-12 -translate-y-1/2 place-items-center rounded-full bg-white text-black transition hover:bg-white/90 disabled:opacity-50"
+                    className="absolute right-2 top-1/2 z-[60] grid size-12 -translate-y-1/2 place-items-center rounded-full bg-primary text-primary-foreground transition hover:bg-primary/95 disabled:opacity-50 dark:bg-white dark:text-black"
                     aria-label={canSend ? "Send" : "Voice mode"}
                     title={canSend ? "Send" : "Voice mode"}
                   >
                     {canSend ? (
                       <WandSparklesIcon className="size-4" />
                     ) : (
-                      <AudioLines className="size-4 text-black" />
+                      <AudioLines className="size-4 text-primary-foreground dark:text-black" />
                     )}
                   </button>
                 </div>
@@ -304,7 +304,7 @@ export function ChatInput({
                             setWebSearch(true);
                           }
                         }}
-                        className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3.5 py-2 text-sm text-white/80 transition hover:border-white/20 hover:bg-white/[0.04] hover:text-white"
+                        className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-2 text-sm text-foreground/80 transition hover:border-muted hover:bg-muted/10 hover:text-foreground"
                       >
                         <Icon className="h-4 w-4" />
                         {action.label}
@@ -321,7 +321,7 @@ export function ChatInput({
   }
 
   return (
-    <div className="border-t border-white/[0.06] bg-bg px-4 pb-3 pt-3">
+    <div className="border-t border-border bg-background px-4 pb-3 pt-3">
       <FileUpload.Root>
         {showUploader && files.length > 0 && (
           <FileUpload.List>
@@ -358,11 +358,11 @@ export function ChatInput({
         )}
 
         {showUploader ? (
-          <div className="mx-auto flex w-full max-w-3xl items-end gap-2 rounded-2xl border border-white/[0.06] bg-card p-2 transition-colors focus-within:border-violet-500/30">
+          <div className="mx-auto flex w-full max-w-3xl items-end gap-2 rounded-2xl border border-border bg-card p-2 transition-colors focus-within:border-primary/30">
             <button
               type="button"
               onClick={() => setShowUploader(false)}
-              className="grid size-9 shrink-0 place-items-center rounded-lg text-muted transition hover:bg-white/[0.06] hover:text-white"
+              className="grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-muted/15 hover:text-foreground"
               title="Close file uploader"
               aria-label="Close file uploader"
             >
@@ -382,7 +382,7 @@ export function ChatInput({
                 type="button"
                 onClick={() => handleSend()}
                 disabled={!canSend}
-                className="grid size-9 shrink-0 place-items-center rounded-full bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-muted"
+                className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition hover:bg-primary/95 disabled:cursor-not-allowed disabled:bg-muted/10 disabled:text-muted-foreground dark:bg-white dark:text-black"
                 aria-label="Send"
                 title="Send"
               >
@@ -396,7 +396,7 @@ export function ChatInput({
             <StopButton onStop={onStop} />
           </div>
         ) : (
-          <div className="relative mx-auto h-16 w-full max-w-3xl overflow-hidden rounded-full border border-white/5 bg-[#1e1e1e] shadow-md">
+          <div className="relative mx-auto h-16 w-full max-w-3xl overflow-hidden rounded-full border border-border bg-card shadow-sm">
             <BorderBeam
               size={90}
               duration={10}
@@ -407,7 +407,7 @@ export function ChatInput({
             <button
               type="button"
               onClick={() => setShowUploader(true)}
-              className="absolute left-4 top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full text-zinc-400 transition hover:text-white"
+              className="absolute left-4 top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:text-foreground hover:bg-muted/10"
               title="Attach files"
               aria-label="Attach files"
             >
@@ -431,8 +431,8 @@ export function ChatInput({
               onClick={() => setWebSearch((prev) => !prev)}
               className={`absolute right-[240px] top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full transition ${
                 webSearch
-                  ? "bg-violet-500/20 text-violet-400 hover:text-violet-300"
-                  : "text-zinc-400 hover:text-white"
+                  ? "bg-primary/20 text-primary hover:text-primary/90"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/10"
               }`}
               aria-label="Web Search"
               title={webSearch ? "Web Search (Aktif)" : "Web Search (Nonaktif)"}
@@ -442,7 +442,7 @@ export function ChatInput({
             <button
               type="button"
               onClick={() => setIsLibraryOpen(true)}
-              className="absolute right-[108px] top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full text-zinc-400 transition hover:text-white"
+              className="absolute right-[108px] top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:text-foreground hover:bg-muted/10"
               aria-label="Prompt Library"
               title="Prompt Library"
             >
@@ -450,14 +450,14 @@ export function ChatInput({
             </button>
             <button
               type="button"
-              className="absolute right-[152px] top-1/2 z-[60] inline-flex -translate-y-1/2 items-center gap-1 rounded-full px-2 py-1 text-sm text-zinc-400 transition hover:text-white"
+              className="absolute right-[152px] top-1/2 z-[60] inline-flex -translate-y-1/2 items-center gap-1 rounded-full px-2 py-1 text-sm text-muted-foreground transition hover:text-foreground hover:bg-muted/10"
             >
               Extended
               <ChevronDownIcon className="size-3.5" />
             </button>
             <button
               type="button"
-              className="absolute right-[64px] top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full text-zinc-400 transition hover:text-white"
+              className="absolute right-[64px] top-1/2 z-[60] grid size-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:text-foreground hover:bg-muted/10"
               aria-label="Voice input"
               title="Voice input"
             >
@@ -466,14 +466,14 @@ export function ChatInput({
             <button
               type="button"
               onClick={() => handleSend()}
-              className="absolute right-2 top-1/2 z-[60] grid size-12 -translate-y-1/2 place-items-center rounded-full bg-white text-black transition hover:bg-white/90 disabled:opacity-50"
+              className="absolute right-2 top-1/2 z-[60] grid size-12 -translate-y-1/2 place-items-center rounded-full bg-primary text-primary-foreground transition hover:bg-primary/95 disabled:opacity-50 dark:bg-white dark:text-black"
               aria-label={canSend ? "Send" : "Voice mode"}
               title={canSend ? "Send" : "Voice mode"}
             >
               {canSend ? (
                 <WandSparklesIcon className="size-4" />
               ) : (
-                <AudioLines className="size-4 text-black" />
+                <AudioLines className="size-4 text-primary-foreground dark:text-black" />
               )}
             </button>
           </div>

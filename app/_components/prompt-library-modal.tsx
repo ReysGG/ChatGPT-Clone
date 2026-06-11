@@ -234,25 +234,25 @@ export function PromptLibraryModal({
       onClick={handleBackdropClick}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
     >
-      <div className="relative flex h-[80vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-white/10 bg-[#111] text-white shadow-2xl">
+      <div className="relative flex h-[80vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-border bg-card text-foreground shadow-2xl">
         <BorderBeam
           size={150}
           duration={10}
           borderWidth={1.5}
-          colorFrom="#a78bfa"
-          colorTo="#22d3ee"
+          colorFrom="#3b5979"
+          colorTo="#e5e5e1"
         />
 
         {/* Modal Left Pane: Template List & Search */}
-        <div className="flex w-7/12 flex-col border-r border-white/5 p-5">
+        <div className="flex w-7/12 flex-col border-r border-border p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Sparkles className="size-5 text-violet-400" />
+              <Sparkles className="size-5 text-primary" />
               Pustaka Prompt
             </h2>
             <button
               onClick={handleOpenAddForm}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold hover:bg-violet-700 transition"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition"
             >
               <Plus className="size-3.5" />
               Buat Baru
@@ -261,13 +261,13 @@ export function PromptLibraryModal({
 
           {/* Search bar */}
           <div className="relative mt-4">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               placeholder="Cari template prompt..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-black/40 py-2 pl-10 pr-4 text-sm outline-none focus:border-violet-500/50"
+              className="w-full rounded-xl border border-border bg-background py-2 pl-10 pr-4 text-sm outline-none focus:border-primary/50 text-foreground"
             />
           </div>
 
@@ -282,8 +282,8 @@ export function PromptLibraryModal({
                   onClick={() => setSelectedCategory(cat)}
                   className={`shrink-0 rounded-full px-3.5 py-1 text-xs font-medium transition ${
                     isSelected
-                      ? "bg-white text-black"
-                      : "bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/10 text-muted-foreground hover:bg-muted/20 hover:text-foreground"
                   }`}
                 >
                   {cat}
@@ -295,11 +295,11 @@ export function PromptLibraryModal({
           {/* List items */}
           <div className="mt-4 flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
             {loading ? (
-              <div className="flex h-32 items-center justify-center text-sm text-zinc-400">
+              <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
                 Memuat template...
               </div>
             ) : filteredTemplates.length === 0 ? (
-              <div className="flex h-32 flex-col items-center justify-center text-sm text-zinc-500">
+              <div className="flex h-32 flex-col items-center justify-center text-sm text-muted-foreground">
                 <FileText className="size-8 mb-2 opacity-50" />
                 Tidak ada template ditemukan.
               </div>
@@ -318,25 +318,25 @@ export function PromptLibraryModal({
                     }}
                     className={`group relative flex cursor-pointer flex-col gap-1 rounded-xl border p-3.5 transition ${
                       isSelected
-                        ? "border-violet-500/40 bg-violet-950/20"
-                        : "border-white/5 bg-white/[0.02] hover:border-white/10 hover:bg-white/[0.04]"
+                        ? "border-primary/30 bg-primary/5"
+                        : "border-border bg-muted/5 hover:border-border hover:bg-muted/10"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-col">
-                        <span className="text-sm font-semibold group-hover:text-violet-300 transition">
+                        <span className="text-sm font-semibold group-hover:text-primary transition text-foreground">
                           {item.title}
                         </span>
                         <div className="mt-1 flex items-center gap-2">
-                          <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-zinc-300 font-medium">
+                          <span className="rounded bg-muted/20 px-1.5 py-0.5 text-[10px] text-muted-foreground font-medium">
                             {item.category}
                           </span>
                           {item.isGlobal ? (
-                            <span className="rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] text-blue-300 font-medium border border-blue-500/20">
+                            <span className="rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-600 dark:text-blue-300 font-medium border border-blue-500/20">
                               Global
                             </span>
                           ) : (
-                            <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300 font-medium border border-amber-500/20">
+                            <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-300 font-medium border border-amber-500/20">
                               Pribadi
                             </span>
                           )}
@@ -347,7 +347,7 @@ export function PromptLibraryModal({
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={(e) => handleOpenEditForm(item, e)}
-                            className="p-1 rounded text-zinc-400 hover:bg-white/10 hover:text-white"
+                            className="p-1 rounded text-muted-foreground hover:bg-muted/15 hover:text-foreground"
                             title="Edit template"
                           >
                             <Edit3 className="size-3.5" />
@@ -355,7 +355,7 @@ export function PromptLibraryModal({
                           <button
                             onClick={(e) => handleDeleteTemplate(item.id, e)}
                             disabled={isDeleting}
-                            className="p-1 rounded text-zinc-400 hover:bg-white/10 hover:text-red-400 disabled:opacity-50"
+                            className="p-1 rounded text-muted-foreground hover:bg-muted/15 hover:text-red-500 disabled:opacity-50"
                             title="Hapus template"
                           >
                             <Trash2 className="size-3.5" />
@@ -363,7 +363,7 @@ export function PromptLibraryModal({
                         </div>
                       )}
                     </div>
-                    <p className="mt-1 line-clamp-2 text-xs text-zinc-400">
+                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                       {item.body}
                     </p>
                   </div>
@@ -374,11 +374,11 @@ export function PromptLibraryModal({
         </div>
 
         {/* Modal Right Pane: Detail Preview OR Add/Edit Form */}
-        <div className="flex w-5/12 flex-col bg-black/20 p-5 relative">
+        <div className="flex w-5/12 flex-col bg-muted/5 p-5 relative">
           {/* Close button inside modal right-corner */}
           <button
             onClick={onClose}
-            className="absolute right-4 top-4 grid size-8 place-items-center rounded-lg text-zinc-400 hover:bg-white/10 hover:text-white transition"
+            className="absolute right-4 top-4 grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted/15 hover:text-foreground transition"
           >
             <X className="size-5" />
           </button>
@@ -387,29 +387,29 @@ export function PromptLibraryModal({
             /* ADD / EDIT TEMPLATE FORM */
             <form onSubmit={handleSaveTemplate} className="flex h-full flex-col justify-between pt-8">
               <div className="space-y-4">
-                <h3 className="text-md font-semibold text-violet-300">
+                <h3 className="text-md font-semibold text-primary">
                   {editingTemplate ? "Edit Template" : "Buat Template Baru"}
                 </h3>
 
                 <label className="block space-y-1">
-                  <span className="text-xs font-semibold text-zinc-400">Judul</span>
+                  <span className="text-xs font-semibold text-muted-foreground">Judul</span>
                   <input
                     type="text"
                     required
                     placeholder="Contoh: Pembuat Email"
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-sm outline-none focus:border-violet-500/50"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 text-foreground"
                   />
                 </label>
 
                 <div className="grid grid-cols-2 gap-2">
                   <label className="block space-y-1">
-                    <span className="text-xs font-semibold text-zinc-400">Kategori</span>
+                    <span className="text-xs font-semibold text-muted-foreground">Kategori</span>
                     <select
                       value={formCategory}
                       onChange={(e) => setFormCategory(e.target.value)}
-                      className="w-full rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-sm outline-none focus:border-violet-500/50"
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 text-foreground"
                     >
                       <option value="Umum">Umum</option>
                       <option value="Coding">Coding</option>
@@ -424,40 +424,40 @@ export function PromptLibraryModal({
                         type="checkbox"
                         checked={formIsGlobal}
                         onChange={(e) => setFormIsGlobal(e.target.checked)}
-                        className="rounded border-white/10 bg-black/60 text-violet-500 focus:ring-0 focus:ring-offset-0 size-4"
+                        className="rounded border-border bg-background text-primary focus:ring-0 focus:ring-offset-0 size-4"
                       />
-                      <span className="text-xs font-semibold text-zinc-400">Template Global</span>
+                      <span className="text-xs font-semibold text-muted-foreground">Template Global</span>
                     </label>
                   )}
                 </div>
 
                 <label className="block space-y-1">
-                  <span className="text-xs font-semibold text-zinc-400">Isi Prompt</span>
+                  <span className="text-xs font-semibold text-muted-foreground">Isi Prompt</span>
                   <textarea
                     required
                     rows={8}
                     placeholder="Tulis instruksi prompt Anda di sini..."
                     value={formBody}
                     onChange={(e) => setFormBody(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-xs outline-none focus:border-violet-500/50 resize-none font-mono"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs outline-none focus:border-primary/50 resize-none font-mono text-foreground"
                   />
                 </label>
 
-                {formError && <p className="text-xs text-red-400 font-medium">{formError}</p>}
+                {formError && <p className="text-xs text-red-500 font-medium">{formError}</p>}
               </div>
 
               <div className="flex gap-2 pt-4">
                 <button
                   type="button"
                   onClick={() => setIsFormOpen(false)}
-                  className="flex-1 rounded-lg border border-white/10 py-2 text-xs font-semibold hover:bg-white/5 transition"
+                  className="flex-1 rounded-lg border border-border py-2 text-xs font-semibold hover:bg-muted/10 transition text-foreground"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="flex-1 rounded-lg bg-violet-600 py-2 text-xs font-semibold hover:bg-violet-700 disabled:opacity-60 transition"
+                  className="flex-1 rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition"
                 >
                   {isSaving ? "Menyimpan..." : "Simpan"}
                 </button>
@@ -469,33 +469,33 @@ export function PromptLibraryModal({
               <div className="flex-1 overflow-y-auto space-y-4 pr-1">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="rounded bg-white/10 px-2 py-0.5 text-xs text-zinc-300 font-medium">
+                    <span className="rounded bg-muted/20 px-2 py-0.5 text-xs text-muted-foreground font-medium">
                       {selectedTemplate.category}
                     </span>
                     {selectedTemplate.isGlobal && (
-                      <span className="rounded bg-blue-500/15 px-2 py-0.5 text-xs text-blue-300 font-medium border border-blue-500/20">
+                      <span className="rounded bg-blue-500/10 px-2 py-0.5 text-xs text-blue-600 dark:text-blue-300 font-medium border border-blue-500/20">
                         Global
                       </span>
                     )}
                   </div>
-                  <h3 className="mt-2 text-lg font-bold text-white leading-tight">
+                  <h3 className="mt-2 text-lg font-bold text-foreground leading-tight">
                     {selectedTemplate.title}
                   </h3>
                 </div>
 
-                <div className="rounded-xl border border-white/5 bg-black/40 p-4 font-mono text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed max-h-[30vh] overflow-y-auto">
+                <div className="rounded-xl border border-border bg-muted/15 p-4 font-mono text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed max-h-[30vh] overflow-y-auto">
                   {selectedTemplate.body}
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-4 border-t border-white/5">
+              <div className="flex gap-2 pt-4 border-t border-border">
                 <button
                   type="button"
                   onClick={() => {
                     onInsert(selectedTemplate.body);
                     onClose();
                   }}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-xs font-semibold hover:bg-white/10 hover:text-white transition"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-muted/10 py-3 text-xs font-semibold hover:bg-muted/25 hover:text-foreground transition"
                 >
                   <FileText className="size-4" />
                   Salin ke Chat
@@ -506,7 +506,7 @@ export function PromptLibraryModal({
                     onSend(selectedTemplate.body);
                     onClose();
                   }}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white py-3 text-xs font-semibold text-black hover:bg-zinc-200 transition"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-3 text-xs font-semibold text-primary-foreground hover:bg-primary/95 transition"
                 >
                   <Send className="size-4" />
                   Kirim Langsung
@@ -515,10 +515,10 @@ export function PromptLibraryModal({
             </div>
           ) : (
             /* NO SELECTION VIEW */
-            <div className="flex h-full flex-col items-center justify-center text-center p-6 pt-12 text-zinc-500">
-              <Sparkles className="size-12 mb-3 text-zinc-700 animate-pulse" />
-              <h3 className="text-sm font-semibold text-zinc-400">Pilih Template Prompt</h3>
-              <p className="mt-1 text-xs text-zinc-500 max-w-[200px] leading-relaxed">
+            <div className="flex h-full flex-col items-center justify-center text-center p-6 pt-12 text-muted-foreground">
+              <Sparkles className="size-12 mb-3 text-muted/50 animate-pulse" />
+              <h3 className="text-sm font-semibold text-foreground/80">Pilih Template Prompt</h3>
+              <p className="mt-1 text-xs text-muted-foreground max-w-[200px] leading-relaxed">
                 Pilih salah satu template di panel kiri untuk melihat isi prompt dan menggunakannya.
               </p>
             </div>

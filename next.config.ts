@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const isDev = process.env.NODE_ENV === "development";
+
 const securityHeaders = [
   // Prevent clickjacking — disallow embedding in <iframe> from other origins
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
@@ -21,12 +23,14 @@ const securityHeaders = [
   },
   // Content-Security-Policy — defense-in-depth against XSS.
   // unsafe-inline is required for Next.js style injection and Tailwind.
-  // unsafe-eval is intentionally blocked.
+  // unsafe-eval is only allowed in development mode for hot module replacement (HMR).
   {
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      isDev
+        ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+        : "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",

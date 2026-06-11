@@ -302,42 +302,42 @@ interface Activity {
       onClick={handleBackdropClick}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
     >
-      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-[#111] p-5 text-white shadow-2xl flex flex-col max-h-[85vh]">
+      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-card p-5 text-foreground shadow-2xl flex flex-col max-h-[85vh]">
         <BorderBeam
           size={110}
           duration={10}
           borderWidth={1.5}
-          colorFrom="#a78bfa"
-          colorTo="#22d3ee"
+          colorFrom="#3b5979"
+          colorTo="#e5e5e1"
         />
 
         {/* Modal Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold flex items-center gap-2">
-              <BrainCircuit className="size-5 text-violet-400" />
+              <BrainCircuit className="size-5 text-primary" />
               Settings
             </h2>
-            <p className="mt-1 text-xs text-zinc-400">Atur model default dan memori asisten AI Anda.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Atur model default dan memori asisten AI Anda.</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white transition"
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted/15 hover:text-foreground transition"
           >
             ✕
           </button>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="mt-4 flex border-b border-white/10 text-xs font-semibold">
+        <div className="mt-4 flex border-b border-border text-xs font-semibold">
           <button
             type="button"
             onClick={() => setActiveTab("umum")}
             className={`pb-2.5 pr-4 transition border-b-2 ${
               activeTab === "umum"
-                ? "text-violet-400 border-violet-400"
-                : "text-zinc-400 border-transparent hover:text-white"
+                ? "text-primary border-primary"
+                : "text-muted-foreground border-transparent hover:text-foreground"
             }`}
           >
             Umum
@@ -347,8 +347,8 @@ interface Activity {
             onClick={() => setActiveTab("memori")}
             className={`pb-2.5 px-4 transition border-b-2 ${
               activeTab === "memori"
-                ? "text-violet-400 border-violet-400"
-                : "text-zinc-400 border-transparent hover:text-white"
+                ? "text-primary border-primary"
+                : "text-muted-foreground border-transparent hover:text-foreground"
             }`}
           >
             Memori AI
@@ -358,8 +358,8 @@ interface Activity {
             onClick={() => setActiveTab("aktivitas")}
             className={`pb-2.5 px-4 transition border-b-2 ${
               activeTab === "aktivitas"
-                ? "text-violet-400 border-violet-400"
-                : "text-zinc-400 border-transparent hover:text-white"
+                ? "text-primary border-primary"
+                : "text-muted-foreground border-transparent hover:text-foreground"
             }`}
           >
             Aktivitas
@@ -372,11 +372,11 @@ interface Activity {
             /* GENERAL TAB CONTENT */
             <div className="space-y-4">
               <label className="block space-y-2">
-                <span className="text-xs font-semibold text-zinc-300">Model</span>
+                <span className="text-xs font-semibold text-foreground/80">Model</span>
                 <select
                   value={draft.defaultModel}
                   onChange={(event) => setDraft((prev) => ({ ...prev, defaultModel: event.target.value }))}
-                  className="w-full rounded-lg border border-white/10 bg-black px-3 py-2 text-sm outline-none focus:border-violet-400 transition"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary transition text-foreground"
                 >
                   {MODEL_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -385,7 +385,7 @@ interface Activity {
               </label>
 
               <label className="block space-y-2">
-                <span className="text-xs font-semibold text-zinc-300">System prompt</span>
+                <span className="text-xs font-semibold text-foreground/80">System prompt</span>
                 <textarea
                   value={draft.systemPrompt ?? ""}
                   onChange={(event) =>
@@ -397,17 +397,17 @@ interface Activity {
                   rows={5}
                   maxLength={4200}
                   placeholder="Kosongkan untuk mengikuti System Prompt global dari Admin..."
-                  className="w-full resize-y rounded-lg border border-white/10 bg-black px-3 py-2 text-sm outline-none focus:border-violet-400 transition font-mono placeholder:text-zinc-600"
+                  className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary transition font-mono placeholder:text-muted-foreground text-foreground"
                 />
-                <div className="flex justify-end text-[10px] text-zinc-500">
+                <div className="flex justify-end text-[10px] text-muted-foreground">
                   {(draft.systemPrompt?.length ?? 0)}/4000 karakter
                 </div>
               </label>
 
               <label className="block space-y-2">
-                <span className="flex items-center justify-between text-xs font-semibold text-zinc-300">
+                <span className="flex items-center justify-between text-xs font-semibold text-foreground/80">
                   Temperature
-                  <span className="text-zinc-400">{draft.temperature.toFixed(1)}</span>
+                  <span className="text-muted-foreground">{draft.temperature.toFixed(1)}</span>
                 </span>
                 <input
                   type="range"
@@ -416,18 +416,18 @@ interface Activity {
                   step="0.1"
                   value={draft.temperature}
                   onChange={(event) => setDraft((prev) => ({ ...prev, temperature: Number(event.target.value) }))}
-                  className="w-full accent-violet-400"
+                  className="w-full accent-primary bg-muted/30"
                 />
               </label>
 
               {validationError && (
-                <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300 font-medium">
+                <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-300 font-medium">
                   {validationError}
                 </p>
               )}
 
               {success && (
-                <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 font-medium">
+                <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-600 dark:text-emerald-300 font-medium">
                   Pengaturan berhasil disimpan!
                 </p>
               )}
@@ -437,13 +437,13 @@ interface Activity {
             <div className="space-y-3">
               {!isAuthenticated ? (
                 <div className="py-6 text-center">
-                  <p className="text-xs text-zinc-400">Silakan masuk log terlebih dahulu untuk mengelola memori AI Anda.</p>
+                  <p className="text-xs text-muted-foreground">Silakan masuk log terlebih dahulu untuk mengelola memori AI Anda.</p>
                   <button
                     onClick={() => {
                       onLoginClick();
                       onClose();
                     }}
-                    className="mt-4 rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold hover:bg-violet-700 transition"
+                    className="mt-4 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition"
                   >
                     Log In Sekarang
                   </button>
@@ -451,7 +451,7 @@ interface Activity {
               ) : (
                 <>
                   <div className="flex items-center justify-between gap-4">
-                    <p className="text-xs text-zinc-400 leading-relaxed max-w-[280px]">
+                    <p className="text-xs text-muted-foreground leading-relaxed max-w-[280px]">
                       AI akan mengingat detail di bawah ini di semua obrolan berikutnya.
                     </p>
                     {!isAddingMemory && !editingMemoryId && (
@@ -464,7 +464,7 @@ interface Activity {
                           setMemoryValue("");
                           setMemoryError(null);
                         }}
-                        className="inline-flex items-center gap-1 shrink-0 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold hover:bg-violet-700 transition"
+                        className="inline-flex items-center gap-1 shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition"
                       >
                         <Plus className="size-3.5" />
                         Tambah
@@ -473,16 +473,16 @@ interface Activity {
                   </div>
 
                   {memoryError && (
-                    <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300 font-medium">
+                    <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-300 font-medium">
                       {memoryError}
                     </p>
                   )}
 
                   {/* Add/Edit Memory Form */}
                   {(isAddingMemory || editingMemoryId) && (
-                    <form onSubmit={handleSaveMemoryForm} className="rounded-xl border border-white/10 bg-black/40 p-3.5 space-y-3">
+                    <form onSubmit={handleSaveMemoryForm} className="rounded-xl border border-border bg-muted/5 p-3.5 space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-violet-400">
+                        <span className="text-xs font-bold text-primary">
                           {editingMemoryId ? "Edit Memori" : "Tambah Memori Baru"}
                         </span>
                         <button
@@ -491,38 +491,38 @@ interface Activity {
                             setIsAddingMemory(false);
                             setEditingMemoryId(null);
                           }}
-                          className="text-[10px] text-zinc-400 hover:text-white"
+                          className="text-[10px] text-muted-foreground hover:text-foreground"
                         >
                           Batal
                         </button>
                       </div>
 
                       <label className="block space-y-1">
-                        <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Kunci / Topik</span>
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Kunci / Topik</span>
                         <input
                           type="text"
                           placeholder="Contoh: Nama saya, Pekerjaan, Bahasa favorit"
                           value={memoryKey}
                           onChange={(e) => setMemoryKey(e.target.value)}
-                          className="w-full rounded-lg border border-white/10 bg-black px-3 py-1.5 text-xs outline-none focus:border-violet-400 transition"
+                          className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs outline-none focus:border-primary transition text-foreground"
                         />
                       </label>
 
                       <label className="block space-y-1">
-                        <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Nilai / Detail</span>
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Nilai / Detail</span>
                         <textarea
                           placeholder="Contoh: David Boy, Pengembang Web Fullstack, Typescript"
                           value={memoryValue}
                           onChange={(e) => setMemoryValue(e.target.value)}
                           rows={2}
-                          className="w-full rounded-lg border border-white/10 bg-black px-3 py-1.5 text-xs outline-none focus:border-violet-400 transition"
+                          className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs outline-none focus:border-primary transition text-foreground"
                         />
                       </label>
 
                       <button
                         type="submit"
                         disabled={isSavingMemory}
-                        className="w-full rounded-lg bg-violet-600 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-60 transition"
+                        className="w-full rounded-lg bg-primary py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition"
                       >
                         {isSavingMemory ? "Menyimpan..." : "Simpan Memori"}
                       </button>
@@ -532,23 +532,23 @@ interface Activity {
                   {/* Memories List */}
                   <div className="space-y-2">
                     {loadingMemories ? (
-                      <div className="flex items-center justify-center py-6 text-xs text-zinc-400 gap-2">
-                        <Loader2 className="size-4 animate-spin text-violet-400" />
+                      <div className="flex items-center justify-center py-6 text-xs text-muted-foreground gap-2">
+                        <Loader2 className="size-4 animate-spin text-primary" />
                         Memuat memori...
                       </div>
                     ) : memories.length === 0 ? (
-                      <div className="rounded-xl border border-white/5 border-dashed p-6 text-center text-xs text-zinc-500">
+                      <div className="rounded-xl border border-border border-dashed p-6 text-center text-xs text-muted-foreground">
                         Belum ada memori AI yang disimpan.
                       </div>
                     ) : (
                       memories.map((item) => (
                         <div
                           key={item.id}
-                          className="flex items-start justify-between gap-3 p-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.02] transition"
+                          className="flex items-start justify-between gap-3 p-3 rounded-xl border border-border bg-muted/5 hover:bg-muted/10 transition"
                         >
                           <div className="min-w-0 flex-1">
-                            <span className="block text-xs font-bold text-zinc-200 truncate">{item.key}</span>
-                            <span className="block text-[11px] text-zinc-400 truncate mt-0.5">{item.value}</span>
+                            <span className="block text-xs font-bold text-foreground truncate">{item.key}</span>
+                            <span className="block text-[11px] text-muted-foreground truncate mt-0.5">{item.value}</span>
                           </div>
                           
                           <div className="flex items-center gap-3 shrink-0">
@@ -556,7 +556,7 @@ interface Activity {
                               type="button"
                               onClick={() => handleToggleMemory(item.id, item.enabled)}
                               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                item.enabled ? "bg-violet-600" : "bg-zinc-700"
+                                item.enabled ? "bg-primary" : "bg-muted"
                               }`}
                             >
                               <span
@@ -569,7 +569,7 @@ interface Activity {
                             <button
                               type="button"
                               onClick={() => handleStartEditMemory(item)}
-                              className="p-1 rounded text-zinc-400 hover:bg-white/10 hover:text-white transition"
+                              className="p-1 rounded text-muted-foreground hover:bg-muted/15 hover:text-foreground transition"
                               title="Edit memori"
                             >
                               <Edit3 className="size-3.5" />
@@ -578,7 +578,7 @@ interface Activity {
                             <button
                               type="button"
                               onClick={() => handleDeleteMemory(item.id)}
-                              className="p-1 rounded text-zinc-400 hover:bg-white/10 hover:text-red-400 transition"
+                              className="p-1 rounded text-muted-foreground hover:bg-muted/15 hover:text-red-500 transition"
                               title="Hapus memori"
                             >
                               <Trash2 className="size-3.5" />
@@ -596,76 +596,76 @@ interface Activity {
             <div className="space-y-3">
               {!isAuthenticated ? (
                 <div className="py-6 text-center">
-                  <p className="text-xs text-zinc-400">Silakan masuk log terlebih dahulu untuk melihat aktivitas Anda.</p>
+                  <p className="text-xs text-muted-foreground">Silakan masuk log terlebih dahulu untuk melihat aktivitas Anda.</p>
                   <button
                     onClick={() => {
                       onLoginClick();
                       onClose();
                     }}
-                    className="mt-4 rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold hover:bg-violet-700 transition"
+                    className="mt-4 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition"
                   >
                     Log In Sekarang
                   </button>
                 </div>
               ) : (
                 <>
-                  <p className="text-xs text-zinc-400 leading-relaxed">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
                     Log aktivitas keamanan dan konfigurasi akun Anda selama 30 hari terakhir.
                   </p>
 
                   {activityError && (
-                    <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300 font-medium">
+                    <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-300 font-medium">
                       {activityError}
                     </p>
                   )}
 
                   <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1 custom-scrollbar">
                     {loadingActivities ? (
-                      <div className="flex items-center justify-center py-8 text-xs text-zinc-400 gap-2">
-                        <Loader2 className="size-4 animate-spin text-violet-400" />
+                      <div className="flex items-center justify-center py-8 text-xs text-muted-foreground gap-2">
+                        <Loader2 className="size-4 animate-spin text-primary" />
                         Memuat aktivitas...
                       </div>
                     ) : activities.length === 0 ? (
-                      <div className="rounded-xl border border-white/5 border-dashed p-6 text-center text-xs text-zinc-500">
+                      <div className="rounded-xl border border-border border-dashed p-6 text-center text-xs text-muted-foreground">
                         Belum ada riwayat aktivitas yang tercatat.
                       </div>
                     ) : (
                       activities.map((act) => {
                         let displayType = act.type;
-                        let colorClass = "text-zinc-300";
+                        let colorClass = "text-foreground font-semibold";
                         let detailString = "";
 
                         if (act.type === "login_success") {
                           displayType = "Masuk Log Berhasil";
-                          colorClass = "text-emerald-400 font-semibold";
+                          colorClass = "text-emerald-500 dark:text-emerald-400 font-semibold";
                           detailString = act.metadata?.email ? `Email: ${act.metadata.email}` : "";
                         } else if (act.type === "login_failed") {
                           displayType = "Masuk Log Gagal";
-                          colorClass = "text-red-400 font-semibold";
+                          colorClass = "text-red-500 dark:text-red-400 font-semibold";
                           detailString = act.metadata?.email ? `Email: ${act.metadata.email} (${act.metadata.reason || ""})` : "";
                         } else if (act.type === "register_success") {
                           displayType = "Registrasi Akun Baru";
-                          colorClass = "text-violet-400 font-semibold";
+                          colorClass = "text-primary font-semibold";
                           detailString = act.metadata?.email ? `Email: ${act.metadata.email}` : "";
                         } else if (act.type === "register_failed") {
                           displayType = "Registrasi Gagal";
-                          colorClass = "text-red-400 font-semibold";
+                          colorClass = "text-red-500 dark:text-red-400 font-semibold";
                           detailString = act.metadata?.email ? `Email: ${act.metadata.email} (${act.metadata.reason || ""})` : "";
                         } else if (act.type === "settings_saved") {
                           displayType = "Pengaturan Disimpan";
-                          colorClass = "text-blue-400 font-semibold";
+                          colorClass = "text-blue-500 dark:text-blue-400 font-semibold";
                           detailString = `Model: ${act.metadata?.defaultModel ?? ""}`;
                         } else if (act.type === "share_enabled") {
                           displayType = "Membagikan Percakapan";
-                          colorClass = "text-teal-400 font-semibold";
+                          colorClass = "text-teal-500 dark:text-teal-400 font-semibold";
                           detailString = act.metadata?.conversationTitle ? `"${act.metadata.conversationTitle}"` : "";
                         } else if (act.type === "share_disabled") {
                           displayType = "Menghentikan Berbagi";
-                          colorClass = "text-amber-400 font-semibold";
+                          colorClass = "text-amber-500 dark:text-amber-400 font-semibold";
                           detailString = act.metadata?.conversationTitle ? `"${act.metadata.conversationTitle}"` : "";
                         } else if (act.type === "file_uploaded") {
                           displayType = "Mengunggah File";
-                          colorClass = "text-indigo-400 font-semibold";
+                          colorClass = "text-primary font-semibold";
                           const size = typeof act.metadata?.sizeBytes === "number" ? act.metadata.sizeBytes : 0;
                           detailString = act.metadata?.filename ? `${act.metadata.filename} (${(size / 1024).toFixed(1)} KB)` : "";
                         }
@@ -673,23 +673,24 @@ interface Activity {
                         return (
                           <div
                             key={act.id}
-                            className="flex items-start justify-between p-3 rounded-xl border border-white/5 bg-white/[0.01] text-xs hover:bg-white/[0.02] transition"
+                            className="flex items-start justify-between p-3 rounded-xl border border-border bg-muted/5 text-xs hover:bg-muted/10 transition"
                           >
                             <div className="min-w-0 pr-4">
                               <span className={`block font-bold ${colorClass}`}>{displayType}</span>
                               {detailString && (
-                                <span className="block text-[10px] text-zinc-400 mt-0.5 truncate">
+                                <span className="block text-[10px] text-muted-foreground mt-0.5 truncate">
                                   {detailString}
                                 </span>
                               )}
                             </div>
-                            <span className="text-[10px] text-zinc-500 shrink-0 mt-0.5">
+                            <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5">
                               {new Date(act.createdAt).toLocaleString("id-ID", {
                                 hour: "2-digit",
                                 minute: "2-digit",
                                 day: "2-digit",
                                 month: "short",
-                              })}
+                                textRun: "true",
+                              } as never)}
                             </span>
                           </div>
                         );
@@ -703,12 +704,12 @@ interface Activity {
         </div>
 
         {/* Modal Footer */}
-        <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between shrink-0">
+        <div className="mt-6 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             {activeTab === "umum" && isAuthenticated ? (
               confirmClear ? (
                 <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-900/10 p-1.5">
-                  <span className="text-xs text-red-300">Yakin hapus semua?</span>
+                  <span className="text-xs text-red-600 dark:text-red-300">Yakin hapus semua?</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -722,7 +723,7 @@ interface Activity {
                   <button
                     type="button"
                     onClick={() => setConfirmClear(false)}
-                    className="rounded border border-white/10 px-2 py-1 text-xs text-zinc-300 hover:bg-white/10 transition"
+                    className="rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted/10 transition"
                   >
                     Batal
                   </button>
@@ -731,7 +732,7 @@ interface Activity {
                 <button
                   type="button"
                   onClick={() => setConfirmClear(true)}
-                  className="rounded-lg border border-red-500/30 px-3 py-2 text-xs text-red-300 hover:bg-red-500/10 transition"
+                  className="rounded-lg border border-red-500/30 px-3 py-2 text-xs text-red-600 dark:text-red-300 hover:bg-red-500/10 transition"
                 >
                   Clear all chats
                 </button>
@@ -745,7 +746,7 @@ interface Activity {
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-lg px-4 py-2 text-xs text-zinc-300 hover:bg-white/10 transition"
+                  className="rounded-lg px-4 py-2 text-xs text-muted-foreground hover:bg-muted/10 transition"
                 >
                   Cancel
                 </button>
@@ -753,7 +754,7 @@ interface Activity {
                   type="button"
                   disabled={showSaving}
                   onClick={handleSave}
-                  className="rounded-lg bg-white px-5 py-2 text-xs font-semibold text-black hover:bg-zinc-200 disabled:opacity-60 transition"
+                  className="rounded-lg bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/95 disabled:opacity-60 transition"
                 >
                   {showSaving ? "Saving..." : isAuthenticated ? "Save" : "Login untuk menyimpan"}
                 </button>
@@ -762,7 +763,7 @@ interface Activity {
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg bg-white px-5 py-2 text-xs font-semibold text-black hover:bg-zinc-200 transition"
+                className="rounded-lg bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/95 transition"
               >
                 Selesai
               </button>

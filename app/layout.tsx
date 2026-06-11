@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Geist } from "next/font/google";
+import { Inter } from "next/font/google";
 import { ToastProvider } from "@/components/ui/toast-provider";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "AI Chat Pribadi",
@@ -17,8 +17,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id" className="dark" suppressHydrationWarning>
-      <body className="theme bg-bg text-white antialiased" suppressHydrationWarning>
+    <html lang="id" className="light" suppressHydrationWarning>
+      <body className={`${inter.variable} theme bg-bg text-foreground antialiased`} suppressHydrationWarning>
         <ToastProvider>
           {children}
         </ToastProvider>

@@ -3,11 +3,6 @@ import { PaperClipIcon, CheckIcon } from "@heroicons/react/24/outline";
 import type { Message } from "./types";
 import { formatClockTime } from "./format";
 
-const USER_BUBBLE_STYLE = {
-  background:
-    "linear-gradient(135deg, #7c3aed 0%, #6366f1 50%, #4f46e5 100%)",
-} as const;
-
 interface UserMessageProps {
   message: Message;
 }
@@ -17,8 +12,7 @@ export const UserMessage = memo(function UserMessage({ message }: UserMessagePro
     <li className="flex justify-end">
       <div className="max-w-[80%]">
         <div
-          className="whitespace-pre-wrap rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed text-white shadow-lg shadow-violet-500/10"
-          style={USER_BUBBLE_STYLE}
+          className="whitespace-pre-wrap rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed text-foreground bg-card border border-border shadow-sm"
         >
           {message.content}
           {message.files && message.files.length > 0 && (
@@ -33,7 +27,7 @@ export const UserMessage = memo(function UserMessage({ message }: UserMessagePro
         </div>
         <div className="mt-1.5 flex items-center justify-end gap-1.5 text-[11px] text-muted">
           <span>{message.createdAt ?? formatClockTime()}</span>
-          <span className="flex items-center text-violet-400">
+          <span className="flex items-center text-primary">
             <CheckIcon className="size-3" />
             <CheckIcon className="-ml-1.5 size-3" />
           </span>
