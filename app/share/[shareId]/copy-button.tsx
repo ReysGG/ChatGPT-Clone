@@ -22,7 +22,7 @@ export function CopyButton() {
     <button
       type="button"
       onClick={handleCopy}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/[0.08]"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-muted/10"
     >
       {copied ? (
         <>
@@ -31,7 +31,7 @@ export function CopyButton() {
         </>
       ) : (
         <>
-          <LinkIcon className="h-3.5 w-3.5 text-zinc-400" />
+          <LinkIcon className="h-3.5 w-3.5 text-muted-foreground" />
           <span>Copy link</span>
         </>
       )}

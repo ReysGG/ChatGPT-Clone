@@ -37,13 +37,13 @@ export default async function SharePage({ params }: SharePageProps): Promise<Rea
   if (!conversation) notFound();
 
   return (
-    <main className="min-h-screen bg-bg text-white selection:bg-violet-500/30 selection:text-white">
+    <main className="min-h-screen bg-bg text-foreground selection:bg-primary/20">
       <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 py-6 sm:px-6">
-        <header className="border-b border-white/[0.08] pb-5">
+        <header className="border-b border-border pb-5">
           <div className="flex items-center justify-between gap-4">
             <Link
               href="/"
-              className="inline-flex items-center gap-1.5 text-xs text-zinc-400 transition hover:text-white"
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition hover:text-foreground"
             >
               <ArrowLeftIcon className="h-3 w-3" />
               <span>Back to app</span>
@@ -54,7 +54,7 @@ export default async function SharePage({ params }: SharePageProps): Promise<Rea
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
               </span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-500 dark:text-emerald-400">
                 Shared conversation
               </span>
             </div>
@@ -62,11 +62,11 @@ export default async function SharePage({ params }: SharePageProps): Promise<Rea
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-bold tracking-tight text-white sm:text-2xl">
+              <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
                 {conversation.title}
               </h1>
-              <p className="mt-1.5 text-xs text-zinc-400 sm:text-sm">
-                Dibagikan oleh <span className="font-medium text-zinc-300">{conversation.user.name || "User"}</span> pada {formatSharedDate(conversation.sharedAt ?? conversation.updatedAt)}
+              <p className="mt-1.5 text-xs text-muted-foreground sm:text-sm">
+                Dibagikan oleh <span className="font-medium text-foreground/80">{conversation.user.name || "User"}</span> pada {formatSharedDate(conversation.sharedAt ?? conversation.updatedAt)}
               </p>
             </div>
             <div className="shrink-0">
@@ -77,7 +77,7 @@ export default async function SharePage({ params }: SharePageProps): Promise<Rea
 
         <ol className="flex-1 space-y-5 py-6">
           {conversation.messages.length === 0 ? (
-            <div className="py-12 text-center text-sm text-zinc-500">
+            <div className="py-12 text-center text-sm text-muted-foreground">
               Tidak ada pesan dalam percakapan ini.
             </div>
           ) : (
@@ -89,8 +89,8 @@ export default async function SharePage({ params }: SharePageProps): Promise<Rea
                   <article
                     className={
                       isUser
-                        ? "max-w-[85%] rounded-2xl rounded-br-md bg-violet-600 px-4 py-2.5 text-sm leading-relaxed text-white shadow-md"
-                        : "max-w-full rounded-2xl rounded-tl-md border border-white/[0.08] bg-card px-4 py-2.5 text-sm leading-relaxed text-white shadow-sm sm:max-w-[85%]"
+                        ? "max-w-[85%] rounded-2xl rounded-br-md bg-card border border-border px-4 py-2.5 text-sm leading-relaxed text-foreground shadow-sm"
+                        : "max-w-full rounded-2xl rounded-tl-md border border-border bg-card px-4 py-2.5 text-sm leading-relaxed text-foreground shadow-sm sm:max-w-[85%]"
                     }
                   >
                     {isUser ? (

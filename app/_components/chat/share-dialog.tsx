@@ -76,25 +76,25 @@ export function ShareDialog({
       onClick={handleBackdropClick}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
     >
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#111] p-5 text-white shadow-2xl">
+      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card p-5 text-foreground shadow-2xl">
         <BorderBeam
           size={90}
           duration={8}
           borderWidth={1.5}
-          colorFrom="#a78bfa"
-          colorTo="#34d399"
+          colorFrom="#3b5979"
+          colorTo="#e5e5e1"
         />
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold">Share Conversation</h2>
-            <p className="mt-1 text-sm text-zinc-400">
+            <h2 className="text-lg font-semibold text-foreground">Share Conversation</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
               Bagikan chat ini kepada orang lain.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="grid size-8 place-items-center rounded-md text-zinc-400 hover:bg-white/10 hover:text-white"
+            className="grid size-8 place-items-center rounded-md text-muted-foreground hover:bg-muted/15 hover:text-foreground transition"
             aria-label="Close share modal"
           >
             <XMarkIcon className="size-4" />
@@ -102,7 +102,7 @@ export function ShareDialog({
         </div>
 
         {error && (
-          <div className="mt-3 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-sm text-red-300">
+          <div className="mt-3 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-sm text-red-600 dark:text-red-300 font-medium">
             {error}
           </div>
         )}
@@ -110,28 +110,28 @@ export function ShareDialog({
         <div className="mt-6 space-y-4">
           {chat.isShared ? (
             <>
-              <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-sm text-emerald-400 font-medium">
+              <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400 font-medium">
                 <GlobeAltIcon className="size-5 shrink-0" />
                 <span>Chat ini telah dibagikan secara publik</span>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400">Tautan Publik</label>
+                <label className="text-xs font-semibold text-muted-foreground">Tautan Publik</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     readOnly
                     value={shareUrl}
-                    className="flex-1 rounded-lg border border-white/10 bg-black px-3 py-2 text-sm text-zinc-300 outline-none select-all"
+                    className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none select-all focus:border-primary/50 transition"
                   />
                   <button
                     type="button"
                     onClick={handleCopy}
-                    className="flex items-center justify-center gap-1.5 rounded-lg bg-white px-3 py-2 text-sm font-medium text-black hover:bg-zinc-200 transition shrink-0"
+                    className="flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/95 transition shrink-0"
                   >
                     {isCopied ? (
                       <>
-                        <ClipboardDocumentCheckIcon className="size-4 text-emerald-600" />
+                        <ClipboardDocumentCheckIcon className="size-4 text-emerald-400" />
                         <span>Copied</span>
                       </>
                     ) : (
@@ -149,7 +149,7 @@ export function ShareDialog({
                   href={`/share/${chat.shareId}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] py-2 text-sm font-medium text-white transition text-center"
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-border bg-muted/10 hover:bg-muted/20 py-2 text-sm font-semibold text-foreground transition text-center"
                 >
                   <GlobeAltIcon className="size-4" />
                   Open Public Page
@@ -158,7 +158,7 @@ export function ShareDialog({
                   type="button"
                   onClick={handleToggleShare}
                   disabled={isLoading}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 py-2 text-sm font-medium text-white transition"
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 py-2 text-sm font-semibold text-white transition"
                 >
                   <PowerIcon className="size-4" />
                   {isLoading ? "Revoking..." : "Stop Sharing"}
@@ -167,17 +167,17 @@ export function ShareDialog({
             </>
           ) : (
             <div className="space-y-4 text-center py-4">
-              <div className="mx-auto grid size-12 place-items-center rounded-full bg-zinc-800 text-zinc-400">
+              <div className="mx-auto grid size-12 place-items-center rounded-full bg-muted/10 text-muted-foreground border border-border">
                 <GlobeAltIcon className="size-6" />
               </div>
-              <p className="text-sm text-zinc-400 px-4">
+              <p className="text-sm text-muted-foreground px-4 leading-relaxed">
                 Siapa pun yang memiliki link ini akan dapat membaca riwayat percakapan ini. Kamu dapat menghentikan share kapan saja.
               </p>
               <button
                 type="button"
                 onClick={handleToggleShare}
                 disabled={isLoading}
-                className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 disabled:opacity-50 py-2.5 text-sm font-medium text-white transition"
+                className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-primary hover:bg-primary/95 disabled:opacity-50 py-2.5 text-sm font-semibold text-primary-foreground transition"
               >
                 {isLoading ? "Membagikan..." : "Bagikan Percakapan Ini"}
               </button>
