@@ -50,3 +50,9 @@ generated/
 
 # OS
 Thumbs.db
+
+# Google Cookies (sensitive auth data)
+cookies/*.json
+
+# Generated images from Google Flow
+public/generated-images/

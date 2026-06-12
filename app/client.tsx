@@ -76,10 +76,14 @@ export default function HomeClient(): React.ReactElement {
               await state.updateTags(activeChat.id, tagNames);
             }
           }}
+          isGeneratingImage={state.isGeneratingImage}
+          imageGenProgress={state.imageGenProgress}
         />
         <ChatInput
           onSend={(message, files, webSearch) => state.sendMessage(message, files, null, webSearch)}
+          onImageGenerate={(prompt) => state.generateImage(prompt)}
           isStreaming={state.isStreaming}
+          isGeneratingImage={state.isGeneratingImage}
           isEmpty={state.messages.length === 0}
           onStop={state.stopStreaming}
           session={state.session}

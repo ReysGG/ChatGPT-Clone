@@ -2,6 +2,7 @@
 
 import { ChatHeader } from "./chat-header";
 import { MessageList } from "./message-list";
+import { ImageProgress, type ImageGenStage } from "./image-progress";
 import type { FeedbackValue } from "./types";
 
 export interface ChatPanelProps {
@@ -28,6 +29,8 @@ export interface ChatPanelProps {
   onShare?: () => void;
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
+  isGeneratingImage?: boolean;
+  imageGenProgress?: { stage: ImageGenStage; message: string } | null;
 }
 
 export function ChatPanel({
@@ -54,6 +57,8 @@ export function ChatPanel({
   onShare,
   isSidebarOpen,
   onToggleSidebar,
+  isGeneratingImage,
+  imageGenProgress,
 }: ChatPanelProps): React.ReactElement {
   return (
     <>
@@ -85,6 +90,20 @@ export function ChatPanel({
           onCopy={onCopy}
           onFeedback={onFeedback}
         />
+        {/* Image generation progress indicator */}
+        {isGeneratingImage && imageGenProgress && (
+          <div className="mx-auto mt-4 max-w-3xl">
+            <div className="flex gap-3">
+              <div className="size-8 shrink-0" />{/* Spacer to align with messages */}
+              <div className="min-w-0 flex-1">
+                <ImageProgress
+                  stage={imageGenProgress.stage}
+                  message={imageGenProgress.message}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

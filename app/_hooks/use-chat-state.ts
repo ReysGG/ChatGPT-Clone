@@ -5,6 +5,7 @@ import type { ChatItem } from "../_components/sidebar/types";
 import type { FeedbackValue, Message } from "../_components/chat/types";
 import type { UploadedFile } from "../_components/chat-input/types";
 import type { ChatSettings } from "../_components/settings-modal";
+import type { ImageGenStage } from "../_components/chat/image-progress";
 
 const COPY_FEEDBACK_MS = 1_500;
 const STREAM_ASSISTANT_ID = "streaming-assistant";
@@ -95,12 +96,19 @@ function uniqueById(messages: Message[]): Message[] {
   );
 }
 
+export interface ImageGenProgressState {
+  stage: ImageGenStage;
+  message: string;
+}
+
 export interface UseChatState {
   chats: ChatItem[];
   activeChatId: string | null;
   messages: Message[];
   isLoadingConversations: boolean;
   isStreaming: boolean;
+  isGeneratingImage: boolean;
+  imageGenProgress: ImageGenProgressState | null;
   promptSeed: number;
   copiedId: string | null;
   feedback: Record<string, FeedbackValue | null>;
@@ -117,6 +125,7 @@ export interface UseChatState {
   deleteChat: (id: string) => void;
   renameChat: (id: string, title: string) => void;
   sendMessage: (text: string, files: UploadedFile[], forceChatId?: string | null, webSearch?: boolean) => void;
+  generateImage: (prompt: string) => void;
   stopStreaming: () => void;
   copyMessage: (id: string, content: string) => void;
   rateMessage: (id: string, value: FeedbackValue) => void;
@@ -156,6 +165,8 @@ export function useChatState(): UseChatState {
   const [conversationsCursor, setConversationsCursor] = useState<string | null>(null);
   const [hasMoreConversations, setHasMoreConversations] = useState<boolean>(false);
   const [isLoadingMoreConversations, setIsLoadingMoreConversations] = useState<boolean>(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
+  const [imageGenProgress, setImageGenProgress] = useState<ImageGenProgressState | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const activeMessages = activeChatId ? messagesByChat[activeChatId] ?? [] : [];
@@ -718,12 +729,205 @@ export function useChatState(): UseChatState {
     setAuthError(null);
   }, []);
 
+  const generateImage = useCallback(
+    (prompt: string) => {
+      if (isStreaming || isGeneratingImage) return;
+      if (!session.isAuthenticated) {
+        setAuthError("Login diperlukan untuk generate gambar.");
+        window.dispatchEvent(new CustomEvent("ai-chat-login-required", {
+          detail: { text: prompt },
+        }));
+        return;
+      }
+
+      const targetChatId = activeChatId;
+      const optimisticChatId = targetChatId ?? `temp-${nextId()}`;
+      const optimisticUserMessage: Message = {
+        id: `temp-user-${nextId()}`,
+        role: "user",
+        content: prompt,
+      };
+      const streamingAssistantMessage: Message = {
+        id: STREAM_ASSISTANT_ID,
+        role: "assistant",
+        content: "",
+      };
+
+      setMessagesByChat((prev) => ({
+        ...prev,
+        [optimisticChatId]: [
+          ...(prev[optimisticChatId] ?? []),
+          optimisticUserMessage,
+          streamingAssistantMessage,
+        ],
+      }));
+      setActiveChatId(optimisticChatId);
+      setIsGeneratingImage(true);
+      setImageGenProgress({ stage: "connecting", message: "Memulai..." });
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      void (async () => {
+        let confirmedChatId = optimisticChatId;
+        let confirmedUserMessage: Message | null = null;
+
+        try {
+          const response = await fetch("/api/image-generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt,
+              conversationId: targetChatId,
+            }),
+            signal: controller.signal,
+          });
+
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || `Request failed: ${response.status}`);
+          }
+
+          if (!response.body) {
+            throw new Error("Streaming not supported.");
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split("\n\n");
+            buffer = events.pop() ?? "";
+
+            for (const rawEvent of events) {
+              const parsed = parseSseEvent(rawEvent);
+              if (!parsed) continue;
+
+              if (parsed.event === "meta") {
+                const data = parsed.data as StreamMeta;
+                confirmedChatId = data.conversation.id;
+                confirmedUserMessage = toMessage(data.userMessage);
+
+                setChats((prev) => {
+                  const without = prev.filter((chat) => chat.id !== data.conversation.id);
+                  return [data.conversation, ...without];
+                });
+                setMessagesByChat((prev) => {
+                  const { [optimisticChatId]: _drop, ...rest } = prev;
+                  const previousMessages = targetChatId ? prev[targetChatId] ?? [] : [];
+                  const cleanedPrevious = previousMessages.filter(
+                    (msg) => !msg.id.startsWith("temp-user-") && msg.id !== STREAM_ASSISTANT_ID
+                  );
+                  return {
+                    ...rest,
+                    [data.conversation.id]: [
+                      ...cleanedPrevious,
+                      confirmedUserMessage!,
+                      streamingAssistantMessage,
+                    ],
+                  };
+                });
+                setActiveChatId(data.conversation.id);
+                continue;
+              }
+
+              if (parsed.event === "progress") {
+                const data = parsed.data as { stage: string; message: string };
+                setImageGenProgress({
+                  stage: data.stage as ImageGenProgressState["stage"],
+                  message: data.message,
+                });
+                continue;
+              }
+
+              if (parsed.event === "done") {
+                const data = parsed.data as StreamDone;
+                const finalAssistantMessage = toMessage(data.assistantMessage);
+
+                setChats((prev) => {
+                  const without = prev.filter((chat) => chat.id !== data.conversation.id);
+                  return [data.conversation, ...without];
+                });
+                setMessagesByChat((prev) => {
+                  const existing = prev[data.conversation.id] ?? [];
+                  const withoutStreaming = existing.filter(
+                    (msg) => msg.id !== STREAM_ASSISTANT_ID
+                  );
+                  const withConfirmedUser = confirmedUserMessage
+                    ? uniqueById([...withoutStreaming, confirmedUserMessage])
+                    : withoutStreaming;
+                  return {
+                    ...prev,
+                    [data.conversation.id]: uniqueById([
+                      ...withConfirmedUser,
+                      finalAssistantMessage,
+                    ]),
+                  };
+                });
+                setActiveChatId(data.conversation.id);
+                setImageGenProgress({ stage: "done", message: "Gambar berhasil digenerate!" });
+                continue;
+              }
+
+              if (parsed.event === "error") {
+                const data = parsed.data as { error: string; assistantMessage?: ApiMessage };
+                if (data.assistantMessage) {
+                  const errorMsg = toMessage(data.assistantMessage);
+                  setMessagesByChat((prev) => ({
+                    ...prev,
+                    [confirmedChatId]: replaceMessage(
+                      prev[confirmedChatId] ?? [],
+                      STREAM_ASSISTANT_ID,
+                      errorMsg
+                    ),
+                  }));
+                }
+                setImageGenProgress({ stage: "error", message: data.error });
+                continue;
+              }
+            }
+          }
+        } catch (error) {
+          if ((error as Error).name !== "AbortError") {
+            console.error("Failed to generate image", error);
+            setMessagesByChat((prev) => ({
+              ...prev,
+              [confirmedChatId]: replaceMessage(
+                prev[confirmedChatId] ?? prev[optimisticChatId] ?? [],
+                STREAM_ASSISTANT_ID,
+                {
+                  id: `error-${nextId()}`,
+                  role: "assistant",
+                  content: `⚠️ Gagal generate gambar: ${(error as Error).message}`,
+                }
+              ),
+            }));
+            setImageGenProgress({ stage: "error", message: (error as Error).message });
+          }
+        } finally {
+          setIsGeneratingImage(false);
+          // Clear progress after a delay so user can see "done" state
+          setTimeout(() => setImageGenProgress(null), 3000);
+          abortRef.current = null;
+        }
+      })();
+    },
+    [activeChatId, isStreaming, isGeneratingImage, session.isAuthenticated]
+  );
+
   return {
     chats,
     activeChatId,
     messages: activeMessages,
     isLoadingConversations,
     isStreaming,
+    isGeneratingImage,
+    imageGenProgress,
     promptSeed,
     copiedId,
     feedback,
@@ -738,6 +942,7 @@ export function useChatState(): UseChatState {
     deleteChat,
     renameChat,
     sendMessage,
+    generateImage,
     stopStreaming,
     copyMessage,
     rateMessage,

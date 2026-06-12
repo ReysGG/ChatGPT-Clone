@@ -188,6 +188,20 @@ html:not(.dark) ::-webkit-scrollbar-thumb:hover { background: #efeded; }
   animation: slide-up-fade 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Image generation shimmer animation */
+@keyframes image-gen-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.animate-image-gen-shimmer {
+  animation: image-gen-shimmer 1.8s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) { 
   *, *::before, *::after { 
     animation-duration: 0.01ms !important; 

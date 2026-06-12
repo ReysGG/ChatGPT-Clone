@@ -30,9 +30,32 @@ const EMPTY_ACTIONS = [
   { label: "Look something up", icon: GlobeIcon },
 ];
 
+/** Keywords that trigger image generation instead of normal chat. */
+const IMAGE_KEYWORDS = [
+  /^\/image\s+/i,
+  /^create\s+image[:\s]+/i,
+  /^generate\s+image[:\s]+/i,
+  /^buat\s+gambar[:\s]+/i,
+  /^bikin\s+gambar[:\s]+/i,
+  /^generate\s+gambar[:\s]+/i,
+  /^create\s+an?\s+image[:\s]+/i,
+];
+
+function extractImagePrompt(text: string): string | null {
+  for (const pattern of IMAGE_KEYWORDS) {
+    const match = text.match(pattern);
+    if (match) {
+      return text.slice(match[0].length).trim();
+    }
+  }
+  return null;
+}
+
 export function ChatInput({
   onSend,
+  onImageGenerate,
   isStreaming = false,
+  isGeneratingImage = false,
   isEmpty = false,
   onStop,
   session,
@@ -48,7 +71,8 @@ export function ChatInput({
   >({});
 
   const isAnyUploading = Object.values(uploadingFiles).some((u) => !u.error);
-  const canSend = (value.trim().length > 0 || files.length > 0) && !isAnyUploading && !isStreaming;
+  const isBusy = isStreaming || isGeneratingImage;
+  const canSend = (value.trim().length > 0 || files.length > 0) && !isAnyUploading && !isBusy;
 
   const uploadFile = async (file: File, tempId: string) => {
     setUploadingFiles((prev) => ({
@@ -112,7 +136,16 @@ export function ChatInput({
 
   const handleSend = (message = value): void => {
     const trimmed = message.trim();
-    if ((!trimmed && files.length === 0) || isStreaming || isAnyUploading) return;
+    if ((!trimmed && files.length === 0) || isBusy || isAnyUploading) return;
+
+    // Check if message is an image generation request
+    const imagePrompt = extractImagePrompt(trimmed);
+    if (imagePrompt && onImageGenerate && files.length === 0) {
+      onImageGenerate(imagePrompt);
+      setValue("");
+      return;
+    }
+
     onSend(trimmed, files, webSearch);
     setValue("");
     setFiles([]);
@@ -302,6 +335,8 @@ export function ChatInput({
                         onClick={() => {
                           if (action.label === "Look something up") {
                             setWebSearch(true);
+                          } else if (action.label === "Create an image") {
+                            setValue("/image ");
                           }
                         }}
                         className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-2 text-sm text-foreground/80 transition hover:border-muted hover:bg-muted/10 hover:text-foreground"

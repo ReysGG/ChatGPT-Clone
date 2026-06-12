@@ -9,7 +9,9 @@ export interface UploadedFile {
 
 export interface ChatInputProps {
   onSend: (message: string, files: UploadedFile[], webSearch?: boolean) => void;
+  onImageGenerate?: (prompt: string) => void;
   isStreaming?: boolean;
+  isGeneratingImage?: boolean;
   isEmpty?: boolean;
   onStop?: () => void;
   session: AuthSession;
