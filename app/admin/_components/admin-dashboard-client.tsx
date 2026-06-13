@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Users,
@@ -10,26 +10,25 @@ import {
   MessageSquare,
   Share2,
   Trash2,
-  ShieldAlert,
+  ShieldCheck,
   RefreshCw,
-  CheckCircle2,
-  XCircle,
-  Search,
   ArrowLeft,
   Server,
   Database,
   BarChart3,
-  Clock
+  Clock,
+  Wrench,
+  Image as ImageIcon,
+  BookOpen,
+  Brain,
+  ExternalLink,
+  Cpu,
+  Gauge,
+  Plus,
+  Pencil,
 } from "lucide-react";
-import { BorderBeam } from "@/components/ui/border-beam";
 import { getModelLabel } from "@/app/_components/settings-modal";
-
-const MODEL_OPTIONS = [
-  "gemini-2.5-flash-lite",
-  "gemini-2.5-flash",
-  "gemini-1.5-flash",
-];
-
+import { useToast } from "@/components/ui/toast-provider";
 import {
   SerializedUser,
   SerializedConversation,
@@ -37,6 +36,127 @@ import {
   AdminDashboardStats,
   UsageStats,
 } from "@/types/admin.types";
+import {
+  Card,
+  PageHeader,
+  StatCard,
+  StatusPill,
+  Button,
+  IconButton,
+  SearchInput,
+  Field,
+  NumberInput,
+  Select,
+  Textarea,
+  Toggle,
+  SettingRow,
+  SectionHeading,
+  EmptyState,
+} from "./ui/primitives";
+import { DataTable } from "./ui/data-table";
+import { useConfirmDialog } from "./ui/confirm-dialog";
+import { KnowledgeFormModal, type KnowledgeFormValues } from "./ui/knowledge-form-modal";
+
+const MODEL_OPTIONS = ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-1.5-flash"];
+
+// Rough public Gemini Flash rates (USD / 1M tokens) — clearly an estimate.
+const RATE_INPUT_PER_M = 0.075;
+const RATE_OUTPUT_PER_M = 0.3;
+
+const TABS = [
+  { id: "dashboard", label: "Dashboard", icon: Activity },
+  { id: "users", label: "Manajemen User", icon: Users },
+  { id: "audit", label: "Audit Percakapan", icon: MessageSquare },
+  { id: "activity", label: "Log Aktivitas", icon: Clock },
+  { id: "usage", label: "Statistik Penggunaan", icon: BarChart3 },
+  { id: "knowledge", label: "Knowledge Base", icon: BookOpen },
+  { id: "settings", label: "Setelan Sistem", icon: Settings },
+  { id: "maintenance", label: "Kesehatan & Latensi", icon: Server },
+] as const;
+
+type TabId = (typeof TABS)[number]["id"];
+
+const TAB_META: Record<TabId, { eyebrow: string; title: string; description: string }> = {
+  dashboard: { eyebrow: "Ringkasan", title: "Dashboard", description: "Pantau kesehatan sistem dan metrik utama dalam satu tampilan." },
+  users: { eyebrow: "Manajemen", title: "Manajemen User", description: "Cari, keluarkan paksa, atau hapus akun pengguna." },
+  audit: { eyebrow: "Moderasi", title: "Audit Percakapan", description: "Tinjau dan cabut tautan berbagi percakapan pengguna." },
+  activity: { eyebrow: "Audit", title: "Log Aktivitas", description: "Riwayat peristiwa autentikasi dan sistem terbaru." },
+  usage: { eyebrow: "Analitik", title: "Statistik Penggunaan", description: "Konsumsi token dan kuota harian per pengguna." },
+  knowledge: { eyebrow: "Konten", title: "Knowledge Base", description: "Tinjau dan moderasi basis pengetahuan semua pengguna." },
+  settings: { eyebrow: "Konfigurasi", title: "Setelan Sistem", description: "Default AI, kebijakan & kuota, tools, dan guardrails." },
+  maintenance: { eyebrow: "Operasional", title: "Kesehatan & Latensi", description: "Cek konektivitas database PostgreSQL dan API Gemini." },
+};
+
+type PillTone = "neutral" | "success" | "danger" | "info" | "warning";
+
+const ACTIVITY_META: Record<string, { label: string; tone: PillTone }> = {
+  login_success: { label: "Login berhasil", tone: "success" },
+  login_failed: { label: "Login gagal", tone: "danger" },
+  register_success: { label: "Registrasi baru", tone: "info" },
+  register_failed: { label: "Registrasi gagal", tone: "danger" },
+  settings_saved: { label: "Pengaturan disimpan", tone: "info" },
+  share_enabled: { label: "Membagikan percakapan", tone: "success" },
+  share_disabled: { label: "Menghentikan berbagi", tone: "warning" },
+  file_uploaded: { label: "Mengunggah file", tone: "neutral" },
+};
+
+type AdminActivity = {
+  id: string;
+  type: string;
+  createdAt: string | Date;
+  userId?: string;
+  userName?: string;
+  userEmail?: string;
+  metadata?: Record<string, unknown>;
+};
+
+type AdminKnowledgeEntry = {
+  id: string;
+  title: string;
+  tags: string | null;
+  enabled: boolean;
+  isGlobal: boolean;
+  source: string | null;
+  content: string;
+  contentPreview: string;
+  contentLength: number;
+  userEmail: string | null;
+  userName: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type HealthData = {
+  status?: string;
+  environment?: string;
+  database?: { latencyMs: number };
+  gemini?: { configured: boolean };
+  [key: string]: unknown;
+} | null;
+
+function activityDetail(act: AdminActivity): string {
+  const md = act.metadata as Record<string, unknown> | undefined;
+  if (!md) return "";
+  switch (act.type) {
+    case "login_success":
+    case "register_success":
+      return typeof md.email === "string" ? `Email: ${md.email}` : "";
+    case "login_failed":
+    case "register_failed":
+      return typeof md.email === "string" ? `Email: ${md.email}${md.reason ? ` (${md.reason})` : ""}` : "";
+    case "settings_saved":
+      return md.defaultModel ? `Model: ${md.defaultModel}` : "";
+    case "share_enabled":
+    case "share_disabled":
+      return typeof md.conversationTitle === "string" ? `"${md.conversationTitle}"` : "";
+    case "file_uploaded": {
+      const size = typeof md.sizeBytes === "number" ? md.sizeBytes : 0;
+      return typeof md.filename === "string" ? `${md.filename} (${(size / 1024).toFixed(1)} KB)` : "";
+    }
+    default:
+      return "";
+  }
+}
 
 interface AdminDashboardClientProps {
   initialUsers: SerializedUser[];
@@ -55,57 +175,67 @@ export function AdminDashboardClient({
   usageStats,
   adminEmail,
 }: AdminDashboardClientProps): React.ReactElement {
-  const [activeTab, setActiveTab] = useState<string>("dashboard");
-  
-  // Users state
+  const toast = useToast();
+  const { confirm, dialog } = useConfirmDialog();
+
+  const [activeTab, setActiveTab] = useState<TabId>("dashboard");
+
   const [users, setUsers] = useState<SerializedUser[]>(initialUsers);
   const [userSearch, setUserSearch] = useState("");
   const [actionUserId, setActionUserId] = useState<string | null>(null);
 
-  // Conversations state
   const [conversations, setConversations] = useState<SerializedConversation[]>(initialConversations);
   const [convoSearch, setConvoSearch] = useState("");
   const [actionConvoId, setActionConvoId] = useState<string | null>(null);
 
-  // Settings form state
-  const [settings, setSettings] = useState(initialSettings);
+  const [settings, setSettings] = useState<AdminSettings>(initialSettings);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
-  const [settingsStatus, setSettingsStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  // Health checks state
-  const [healthData, setHealthData] = useState<{ latencyMs?: number; configured?: boolean; status?: string; environment?: string; database?: { latencyMs: number }; gemini?: { configured: boolean }; [key: string]: unknown } | null>(null);
+  const [healthData, setHealthData] = useState<HealthData>(null);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
   const [healthError, setHealthError] = useState<string | null>(null);
-
-  // Admin Activity logs state
-  type AdminActivity = {
-    id: string;
-    type: string;
-    createdAt: string | Date;
-    userId?: string;
-    userName?: string;
-    userEmail?: string;
-    metadata?: Record<string, unknown>;
-  };
 
   const [adminActivities, setAdminActivities] = useState<AdminActivity[]>([]);
   const [loadingAdminActivities, setLoadingAdminActivities] = useState(false);
   const [adminActivityError, setAdminActivityError] = useState<string | null>(null);
   const [adminActivitySearch, setAdminActivitySearch] = useState("");
 
-  // Fetch health data on mount
+  const [knowledgeEntries, setKnowledgeEntries] = useState<AdminKnowledgeEntry[]>([]);
+  const [loadingKnowledge, setLoadingKnowledge] = useState(false);
+  const [knowledgeError, setKnowledgeError] = useState<string | null>(null);
+  const [knowledgeSearch, setKnowledgeSearch] = useState("");
+  const [actionKnowledgeId, setActionKnowledgeId] = useState<string | null>(null);
+  const [knowledgeModalOpen, setKnowledgeModalOpen] = useState(false);
+  const [knowledgeEditing, setKnowledgeEditing] = useState<AdminKnowledgeEntry | null>(null);
+  const [savingKnowledge, setSavingKnowledge] = useState(false);
+
+  // Deep-link tabs via URL hash (kept on refresh / shareable) without changing routes.
   useEffect(() => {
-    fetchHealth();
+    const hash = window.location.hash.replace("#", "");
+    if (TABS.some((t) => t.id === hash)) setActiveTab(hash as TabId);
   }, []);
 
-  // Fetch admin activities on activeTab change
-  useEffect(() => {
-    if (activeTab === "activity") {
-      fetchAdminActivities();
-    }
-  }, [activeTab]);
+  const selectTab = useCallback((id: TabId) => {
+    setActiveTab(id);
+    window.history.replaceState(null, "", `#${id}`);
+  }, []);
 
-  async function fetchAdminActivities() {
+  const fetchHealth = useCallback(async () => {
+    setIsCheckingHealth(true);
+    setHealthError(null);
+    try {
+      const res = await fetch("/api/admin/health");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal memuat data kesehatan");
+      setHealthData(data);
+    } catch (err) {
+      setHealthError((err as Error).message || "Gagal terhubung ke health API");
+    } finally {
+      setIsCheckingHealth(false);
+    }
+  }, []);
+
+  const fetchAdminActivities = useCallback(async () => {
     setLoadingAdminActivities(true);
     setAdminActivityError(null);
     try {
@@ -118,91 +248,190 @@ export function AdminDashboardClient({
     } finally {
       setLoadingAdminActivities(false);
     }
-  }
+  }, []);
 
-  async function fetchHealth() {
-    setIsCheckingHealth(true);
-    setHealthError(null);
+  const fetchKnowledge = useCallback(async () => {
+    setLoadingKnowledge(true);
+    setKnowledgeError(null);
     try {
-      const res = await fetch("/api/admin/health");
+      const res = await fetch("/api/admin/knowledge");
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to fetch health data");
-      setHealthData(data);
+      if (!res.ok) throw new Error(data.error || "Gagal memuat knowledge base");
+      setKnowledgeEntries(data.entries || []);
     } catch (err) {
-      setHealthError((err as Error).message || "Failed to connect to health API");
+      setKnowledgeError((err as Error).message || "Gagal memuat knowledge base");
     } finally {
-      setIsCheckingHealth(false);
+      setLoadingKnowledge(false);
     }
-  }
+  }, []);
 
-  // Force Logout handler
+  useEffect(() => {
+    void fetchHealth();
+  }, [fetchHealth]);
+
+  useEffect(() => {
+    if (activeTab === "activity") void fetchAdminActivities();
+  }, [activeTab, fetchAdminActivities]);
+
+  useEffect(() => {
+    if (activeTab === "knowledge") void fetchKnowledge();
+  }, [activeTab, fetchKnowledge]);
+
   async function handleForceLogout(userId: string) {
-    if (!confirm("Apakah Anda yakin ingin mengeluarkan paksa user ini dari semua perangkat?")) return;
+    const ok = await confirm({
+      title: "Keluarkan paksa user ini?",
+      description: "Semua sesi aktif pengguna akan dihentikan di seluruh perangkat.",
+      confirmLabel: "Keluarkan paksa",
+      tone: "danger",
+    });
+    if (!ok) return;
     setActionUserId(userId);
     try {
       const res = await fetch(`/api/admin/users/${userId}/logout`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal force logout");
-      
-      // Update sessionCount in local state
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, sessionCount: 0 } : u));
-      alert("User berhasil di-force logout.");
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, sessionCount: 0 } : u)));
+      toast.success("User berhasil dikeluarkan dari semua sesi.");
     } catch (err) {
-      alert(`Error: ${(err as Error).message}`);
+      toast.error((err as Error).message || "Gagal force logout.");
     } finally {
       setActionUserId(null);
     }
   }
 
-  // Delete User handler
   async function handleDeleteUser(userId: string) {
-    if (!confirm("PERINGATAN: Menghapus user ini akan menghapus semua percakapan dan pesan mereka secara permanen! Apakah Anda yakin?")) return;
+    const ok = await confirm({
+      title: "Hapus user secara permanen?",
+      description: "Semua percakapan dan pesan milik user ini akan ikut terhapus dan tidak dapat dikembalikan.",
+      confirmLabel: "Hapus permanen",
+      tone: "danger",
+    });
+    if (!ok) return;
     setActionUserId(userId);
     try {
       const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal menghapus user");
-      
-      // Remove from list
-      setUsers(prev => prev.filter(u => u.id !== userId));
-      alert("User berhasil dihapus.");
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      toast.success("User berhasil dihapus.");
     } catch (err) {
-      alert(`Error: ${(err as Error).message}`);
+      toast.error((err as Error).message || "Gagal menghapus user.");
     } finally {
       setActionUserId(null);
     }
   }
 
-  // Unshare Conversation handler
   async function handleUnshare(convoId: string) {
-    if (!confirm("Apakah Anda yakin ingin membatalkan share link percakapan ini?")) return;
+    const ok = await confirm({
+      title: "Batalkan tautan berbagi?",
+      description: "Percakapan akan kembali menjadi privat dan tautan publiknya tidak bisa diakses lagi.",
+      confirmLabel: "Jadikan privat",
+    });
+    if (!ok) return;
     setActionConvoId(convoId);
     try {
       const res = await fetch(`/api/admin/conversations/${convoId}/unshare`, { method: "PATCH" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal membatalkan share");
-
-      // Update in local state
-      setConversations(prev => prev.map(c => c.id === convoId ? { ...c, isShared: false, shareId: null, sharedAt: null } : c));
-      alert("Percakapan berhasil diubah kembali menjadi privat.");
+      setConversations((prev) =>
+        prev.map((c) => (c.id === convoId ? { ...c, isShared: false, shareId: null, sharedAt: null } : c))
+      );
+      toast.success("Percakapan kembali menjadi privat.");
     } catch (err) {
-      alert(`Error: ${(err as Error).message}`);
+      toast.error((err as Error).message || "Gagal membatalkan share.");
     } finally {
       setActionConvoId(null);
     }
   }
 
-  // Save Settings handler
+  async function handleToggleKnowledge(id: string, enabled: boolean) {
+    setActionKnowledgeId(id);
+    try {
+      const res = await fetch(`/api/admin/knowledge/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal memperbarui");
+      setKnowledgeEntries((prev) => prev.map((entry) => (entry.id === id ? { ...entry, enabled } : entry)));
+      toast.success(enabled ? "Pengetahuan diaktifkan." : "Pengetahuan dinonaktifkan.");
+    } catch (err) {
+      toast.error((err as Error).message || "Gagal memperbarui pengetahuan.");
+    } finally {
+      setActionKnowledgeId(null);
+    }
+  }
+
+  async function handleDeleteKnowledge(id: string) {
+    const ok = await confirm({
+      title: "Hapus entri pengetahuan?",
+      description: "Entri ini akan dihapus permanen dari knowledge base pengguna.",
+      confirmLabel: "Hapus",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setActionKnowledgeId(id);
+    try {
+      const res = await fetch(`/api/admin/knowledge/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menghapus");
+      setKnowledgeEntries((prev) => prev.filter((entry) => entry.id !== id));
+      toast.success("Entri pengetahuan dihapus.");
+    } catch (err) {
+      toast.error((err as Error).message || "Gagal menghapus pengetahuan.");
+    } finally {
+      setActionKnowledgeId(null);
+    }
+  }
+
+  function openCreateKnowledge() {
+    setKnowledgeEditing(null);
+    setKnowledgeModalOpen(true);
+  }
+
+  function openEditKnowledge(entry: AdminKnowledgeEntry) {
+    setKnowledgeEditing(entry);
+    setKnowledgeModalOpen(true);
+  }
+
+  async function handleSubmitKnowledge(values: KnowledgeFormValues) {
+    setSavingKnowledge(true);
+    try {
+      const editingId = knowledgeEditing?.id;
+      const res = await fetch(
+        editingId ? `/api/admin/knowledge/${editingId}` : "/api/admin/knowledge",
+        {
+          method: editingId ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: values.title,
+            content: values.content,
+            tags: values.tags.trim() || null,
+            enabled: values.enabled,
+          }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menyimpan");
+      toast.success(editingId ? "Pengetahuan diperbarui." : "Pengetahuan global ditambahkan.");
+      setKnowledgeModalOpen(false);
+      setKnowledgeEditing(null);
+      await fetchKnowledge();
+    } catch (err) {
+      toast.error((err as Error).message || "Gagal menyimpan pengetahuan.");
+    } finally {
+      setSavingKnowledge(false);
+    }
+  }
+
   async function handleSaveSettings(e: React.FormEvent) {
     e.preventDefault();
     setIsSavingSettings(true);
-    setSettingsStatus(null);
     try {
       const res = await fetch("/api/admin/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        // API schema expects `systemPrompt` and `temperature`,
-        // but local state uses the DB field names (`defaultSystemPrompt`, `defaultTemperature`).
         body: JSON.stringify({
           defaultModel: settings.defaultModel,
           systemPrompt: settings.defaultSystemPrompt,
@@ -213,81 +442,99 @@ export function AdminDashboardClient({
           maxPromptLength: settings.maxPromptLength,
           maxMessagesPerUserPerDay: settings.maxMessagesPerUserPerDay,
           rateLimitMessagesPerMinute: settings.rateLimitMessagesPerMinute,
+          toolsEnabled: settings.toolsEnabled,
+          imageToolEnabled: settings.imageToolEnabled,
+          knowledgeToolEnabled: settings.knowledgeToolEnabled,
+          memoryToolEnabled: settings.memoryToolEnabled,
+          guardrailsEnabled: settings.guardrailsEnabled,
+          blockedKeywords: settings.blockedKeywords,
+          maxToolCallsPerMessage: settings.maxToolCallsPerMessage,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal menyimpan setelan");
-      
       setSettings(data.settings);
-      setSettingsStatus({ type: "success", message: "Setelan global berhasil disimpan." });
+      toast.success("Setelan global berhasil disimpan.");
     } catch (err) {
-      setSettingsStatus({ type: "error", message: (err as Error).message || "Gagal menyimpan setelan." });
+      toast.error((err as Error).message || "Gagal menyimpan setelan.");
     } finally {
       setIsSavingSettings(false);
     }
   }
 
-  // Filtering
-  const filteredUsers = users.filter(u =>
-    (u.name || "").toLowerCase().includes(userSearch.toLowerCase()) ||
-    u.email.toLowerCase().includes(userSearch.toLowerCase())
+  const filteredUsers = users.filter(
+    (u) =>
+      (u.name || "").toLowerCase().includes(userSearch.toLowerCase()) ||
+      u.email.toLowerCase().includes(userSearch.toLowerCase())
   );
 
-  const filteredConversations = conversations.filter(c =>
-    c.title.toLowerCase().includes(convoSearch.toLowerCase()) ||
-    c.userEmail.toLowerCase().includes(convoSearch.toLowerCase()) ||
-    (c.userName || "").toLowerCase().includes(convoSearch.toLowerCase())
+  const filteredConversations = conversations.filter(
+    (c) =>
+      c.title.toLowerCase().includes(convoSearch.toLowerCase()) ||
+      c.userEmail.toLowerCase().includes(convoSearch.toLowerCase()) ||
+      (c.userName || "").toLowerCase().includes(convoSearch.toLowerCase())
   );
 
-  const filteredAdminActivities = adminActivities.filter(act => {
+  const filteredAdminActivities = adminActivities.filter((act) => {
     const term = adminActivitySearch.toLowerCase();
-    const typeLabel = act.type.toLowerCase();
-    const userName = (act.userName || "").toLowerCase();
-    const userEmail = (act.userEmail || "").toLowerCase();
-    const detail = JSON.stringify(act.metadata || "").toLowerCase();
-    return typeLabel.includes(term) || userName.includes(term) || userEmail.includes(term) || detail.includes(term);
+    return (
+      act.type.toLowerCase().includes(term) ||
+      (act.userName || "").toLowerCase().includes(term) ||
+      (act.userEmail || "").toLowerCase().includes(term) ||
+      JSON.stringify(act.metadata || "").toLowerCase().includes(term)
+    );
   });
 
+  const filteredKnowledge = knowledgeEntries.filter((entry) => {
+    const term = knowledgeSearch.toLowerCase();
+    return (
+      entry.title.toLowerCase().includes(term) ||
+      entry.contentPreview.toLowerCase().includes(term) ||
+      (entry.tags || "").toLowerCase().includes(term) ||
+      (entry.userEmail || "").toLowerCase().includes(term) ||
+      (entry.userName || "").toLowerCase().includes(term)
+    );
+  });
+
+  const estimatedCost =
+    (usageStats.todayTokens.input * RATE_INPUT_PER_M) / 1_000_000 +
+    (usageStats.todayTokens.output * RATE_OUTPUT_PER_M) / 1_000_000;
+
+  const meta = TAB_META[activeTab];
+
   return (
-    <main className="min-h-screen bg-[#09090b] text-zinc-100 selection:bg-violet-500/30 selection:text-white">
+    <main className="min-h-screen bg-bg text-foreground">
       <div className="flex min-h-screen flex-col md:flex-row">
-        
         {/* Sidebar */}
-        <aside className="w-full border-b border-zinc-800 bg-zinc-900/40 p-6 md:w-72 md:border-b-0 md:border-r md:min-h-screen flex flex-col justify-between">
+        <aside className="flex w-full flex-col justify-between border-b border-border bg-sidebar p-5 md:min-h-screen md:w-64 md:border-b-0 md:border-r">
           <div>
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600 shadow-[0_0_15px_rgba(124,58,237,0.5)]">
-                <ShieldAlert className="h-5 w-5 text-white" />
-              </div>
+            <div className="flex items-center gap-3 px-1">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
+                <ShieldCheck className="h-5 w-5 text-primary-foreground" aria-hidden />
+              </span>
               <div>
-                <h1 className="font-bold tracking-tight text-white text-base">Control Panel</h1>
-                <p className="text-xs text-zinc-500 font-medium">Administrator Console</p>
+                <h1 className="text-sm font-semibold tracking-tight text-foreground">Control Panel</h1>
+                <p className="text-[11px] text-muted-foreground">Konsol Administrator</p>
               </div>
             </div>
 
-            <nav className="mt-8 space-y-1">
-              {[
-                { id: "dashboard", label: "Dashboard", icon: Activity },
-                { id: "users", label: "Manajemen User", icon: Users },
-                { id: "audit", label: "Audit Percakapan", icon: MessageSquare },
-                { id: "activity", label: "Log Aktivitas", icon: Clock },
-                { id: "usage", label: "Statistik Penggunaan", icon: BarChart3 },
-                { id: "settings", label: "Setelan Sistem", icon: Settings },
-                { id: "maintenance", label: "Kesehatan & Latensi", icon: Server },
-              ].map(tab => {
+            <nav aria-label="Navigasi admin" className="mt-7 space-y-1">
+              {TABS.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
+                    type="button"
+                    onClick={() => selectTab(tab.id)}
+                    aria-current={isActive ? "page" : undefined}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar ${
                       isActive
-                        ? "bg-violet-600/10 text-violet-400 border border-violet-500/20"
-                        : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 border border-transparent"
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
                     }`}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-4 w-4 shrink-0" aria-hidden />
                     <span>{tab.label}</span>
                   </button>
                 );
@@ -295,909 +542,816 @@ export function AdminDashboardClient({
             </nav>
           </div>
 
-          <div className="mt-8 pt-4 border-t border-zinc-800/80">
+          <div className="mt-8 border-t border-border pt-4">
             <Link
               href="/"
-              className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2.5 text-center text-xs font-semibold text-zinc-300 transition-all hover:bg-zinc-800 hover:text-white"
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-xs font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
             >
-              <ArrowLeft className="h-3 w-3" />
+              <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
               <span>Kembali ke Chat</span>
             </Link>
           </div>
         </aside>
 
-        {/* Content Area */}
-        <section className="flex-1 p-6 md:p-8 space-y-6 max-w-7xl mx-auto w-full">
+        {/* Content */}
+        <section className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-5 md:p-8">
+          <PageHeader
+            eyebrow={meta.eyebrow}
+            title={meta.title}
+            description={meta.description}
+            actions={
+              activeTab === "activity" ? (
+                <Button variant="secondary" size="sm" onClick={fetchAdminActivities} disabled={loadingAdminActivities}>
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingAdminActivities ? "animate-spin" : ""}`} aria-hidden />
+                  Segarkan
+                </Button>
+              ) : activeTab === "knowledge" ? (
+                <>
+                  <Button variant="secondary" size="sm" onClick={fetchKnowledge} disabled={loadingKnowledge}>
+                    <RefreshCw className={`h-3.5 w-3.5 ${loadingKnowledge ? "animate-spin" : ""}`} aria-hidden />
+                    Segarkan
+                  </Button>
+                  <Button variant="primary" size="sm" onClick={openCreateKnowledge}>
+                    <Plus className="h-3.5 w-3.5" aria-hidden />
+                    Tambah Pengetahuan
+                  </Button>
+                </>
+              ) : activeTab === "dashboard" ? (
+                <Button variant="secondary" size="sm" onClick={fetchHealth} disabled={isCheckingHealth}>
+                  <RefreshCw className={`h-3.5 w-3.5 ${isCheckingHealth ? "animate-spin" : ""}`} aria-hidden />
+                  Perbarui status
+                </Button>
+              ) : undefined
+            }
+          />
 
-          {/* HEADER */}
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-violet-500 uppercase tracking-widest">
-              System Admin
-            </span>
-            <h2 className="text-2xl font-bold tracking-tight text-white capitalize sm:text-3xl">
-              {activeTab === "audit" 
-                ? "Audit Percakapan" 
-                : activeTab === "settings" 
-                  ? "Setelan Sistem" 
-                  : activeTab === "maintenance" 
-                    ? "Kesehatan & Latensi" 
-                    : activeTab === "usage"
-                      ? "Statistik Penggunaan"
-                      : activeTab === "activity"
-                        ? "Log Aktivitas Global"
-                        : activeTab}
-            </h2>
-          </div>
-
-          {/* TAB CONTENT: DASHBOARD */}
+          {/* DASHBOARD */}
           {activeTab === "dashboard" && (
             <div className="space-y-6">
-              
-              {/* Stats Card Grid */}
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard title="Total Pengguna" value={stats.totalUsers} icon={Users} desc="Terdaftar di database" />
-                <StatCard title="Total Percakapan" value={stats.totalConversations} icon={MessageSquare} desc="Chat yang pernah dibuat" />
-                <StatCard title="Total Pesan" value={stats.totalMessages} icon={MessageSquare} desc="Total dialog dengan AI" />
-                <StatCard title="Sesi Aktif" value={stats.activeSessions} icon={LogOut} desc="User yang sedang login" />
+                <StatCard label="Total Pengguna" value={stats.totalUsers.toLocaleString("id-ID")} icon={Users} hint="Terdaftar" />
+                <StatCard label="Total Percakapan" value={stats.totalConversations.toLocaleString("id-ID")} icon={MessageSquare} delta={{ value: `+${stats.conversationsCreatedToday} hari ini`, tone: stats.conversationsCreatedToday > 0 ? "up" : "neutral" }} />
+                <StatCard label="Total Pesan" value={stats.totalMessages.toLocaleString("id-ID")} icon={Cpu} delta={{ value: `+${stats.messagesCreatedToday} hari ini`, tone: stats.messagesCreatedToday > 0 ? "up" : "neutral" }} />
+                <StatCard label="Sesi Aktif" value={stats.activeSessions.toLocaleString("id-ID")} icon={LogOut} hint="Sedang login" />
               </div>
 
-              {/* Dynamic Health & Daily Stats Cards */}
-              <div className="grid gap-6 md:grid-cols-3">
-                
-                {/* Daily Activity */}
-                <div className="md:col-span-2 rounded-xl border border-zinc-800 bg-zinc-900/20 backdrop-blur-md p-6 relative overflow-hidden">
-                  <BorderBeam size={100} duration={8} borderWidth={1} colorFrom="#7c3aed" colorTo="#3b82f6" />
-                  <h3 className="text-lg font-semibold text-white">Aktivitas Hari Ini</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">Statistik pertumbuhan dalam 24 jam terakhir</p>
-                  
-                  <div className="mt-6 grid grid-cols-2 gap-4">
-                    <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-lg p-4">
-                      <span className="text-xs text-zinc-500 font-medium">Chat Baru Hari Ini</span>
-                      <p className="text-2xl font-bold text-violet-400 mt-1">+{stats.conversationsCreatedToday}</p>
+              <div className="grid gap-6 lg:grid-cols-3">
+                <Card className="p-6 lg:col-span-2">
+                  <SectionHeading title="Aktivitas Hari Ini" description="Pertumbuhan dalam 24 jam terakhir." />
+                  <div className="mt-5 grid grid-cols-2 gap-4">
+                    <div className="rounded-xl border border-border bg-accent/50 p-4">
+                      <span className="text-xs font-medium text-muted-foreground">Chat Baru</span>
+                      <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">+{stats.conversationsCreatedToday}</p>
                     </div>
-                    <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-lg p-4">
-                      <span className="text-xs text-zinc-500 font-medium">Pesan Baru Hari Ini</span>
-                      <p className="text-2xl font-bold text-blue-400 mt-1">+{stats.messagesCreatedToday}</p>
+                    <div className="rounded-xl border border-border bg-accent/50 p-4">
+                      <span className="text-xs font-medium text-muted-foreground">Pesan Baru</span>
+                      <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">+{stats.messagesCreatedToday}</p>
                     </div>
                   </div>
-                  <div className="mt-4 text-xs text-zinc-500">
-                    Sistem berbagi link: <span className="font-semibold text-emerald-400">{stats.totalSharedConversations} chat publik</span> telah diaktifkan.
-                  </div>
-                </div>
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    Percakapan publik aktif:{" "}
+                    <span className="font-semibold text-foreground tabular-nums">{stats.totalSharedConversations}</span>
+                  </p>
+                </Card>
 
-                {/* DB Health Status Card */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/20 backdrop-blur-md p-6 flex flex-col justify-between">
+                <Card className="flex flex-col justify-between p-6">
                   <div>
-                    <h3 className="text-base font-semibold text-white">Status Konektivitas</h3>
-                    <p className="text-xs text-zinc-400 mt-0.5">Koneksi real-time provider data</p>
-                    
+                    <SectionHeading title="Konektivitas" description="Status provider data real-time." />
                     <div className="mt-5 space-y-4">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Database className="h-4 w-4 text-zinc-400" />
-                          <span className="text-sm font-medium text-zinc-300">Database PG</span>
-                        </div>
-                        {healthData ? (
-                          <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
-                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                            <span>{healthData.database?.latencyMs} ms</span>
-                          </div>
+                        <span className="flex items-center gap-2 text-sm text-foreground">
+                          <Database className="h-4 w-4 text-muted-foreground" aria-hidden />
+                          Database PG
+                        </span>
+                        {healthData?.database ? (
+                          <StatusPill tone="success" dot>{healthData.database.latencyMs} ms</StatusPill>
                         ) : (
-                          <span className="text-xs text-zinc-500">Checking...</span>
+                          <span className="text-xs text-muted-foreground">{isCheckingHealth ? "Memeriksa…" : "—"}</span>
                         )}
                       </div>
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Server className="h-4 w-4 text-zinc-400" />
-                          <span className="text-sm font-medium text-zinc-300">Gemini Key</span>
-                        </div>
-                        {healthData ? (
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                            healthData.gemini?.configured ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
-                          }`}>
-                            {healthData.gemini?.configured ? "Terkonfigurasi" : "Belum Set"}
-                          </span>
+                        <span className="flex items-center gap-2 text-sm text-foreground">
+                          <Server className="h-4 w-4 text-muted-foreground" aria-hidden />
+                          Gemini Key
+                        </span>
+                        {healthData?.gemini ? (
+                          <StatusPill tone={healthData.gemini.configured ? "success" : "danger"}>
+                            {healthData.gemini.configured ? "Terkonfigurasi" : "Belum diset"}
+                          </StatusPill>
                         ) : (
-                          <span className="text-xs text-zinc-500">Checking...</span>
+                          <span className="text-xs text-muted-foreground">{isCheckingHealth ? "Memeriksa…" : "—"}</span>
                         )}
                       </div>
                     </div>
                   </div>
-
-                  <button
-                    onClick={fetchHealth}
-                    disabled={isCheckingHealth}
-                    className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold py-2 text-zinc-300 transition-all"
-                  >
-                    <RefreshCw className={`h-3 w-3 ${isCheckingHealth ? "animate-spin" : ""}`} />
-                    <span>Perbarui Status</span>
-                  </button>
-                </div>
-
+                  <Button variant="secondary" size="sm" className="mt-6 w-full" onClick={fetchHealth} disabled={isCheckingHealth}>
+                    <RefreshCw className={`h-3.5 w-3.5 ${isCheckingHealth ? "animate-spin" : ""}`} aria-hidden />
+                    Perbarui Status
+                  </Button>
+                </Card>
               </div>
-
             </div>
           )}
 
-          {/* TAB CONTENT: USER MANAGEMENT */}
+          {/* USERS */}
           {activeTab === "users" && (
             <div className="space-y-4">
-              
-              {/* Search Control */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                <input
-                  type="text"
-                  placeholder="Cari user berdasarkan nama atau email..."
-                  value={userSearch}
-                  onChange={e => setUserSearch(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900/40 py-2.5 pl-10 pr-4 text-sm text-white placeholder-zinc-500 outline-none transition focus:border-violet-500"
-                />
-              </div>
-
-              {/* Users Table */}
-              <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/10 backdrop-blur-md">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm text-zinc-300">
-                    <thead className="border-b border-zinc-800 bg-zinc-950/40 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                      <tr>
-                        <th className="px-4 py-3">Nama & Email</th>
-                        <th className="px-4 py-3">Tanggal Daftar</th>
-                        <th className="px-4 py-3 text-center">Chat / Pesan</th>
-                        <th className="px-4 py-3 text-center">Sesi Aktif</th>
-                        <th className="px-4 py-3 text-right">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-800/60 bg-zinc-900/10">
-                      {filteredUsers.map(user => {
-                        const isSelf = user.email.toLowerCase() === adminEmail.toLowerCase();
-                        return (
-                          <tr key={user.id} className="hover:bg-zinc-800/20 transition-colors">
-                            <td className="px-4 py-3.5">
-                              <div>
-                                <span className="font-semibold text-zinc-100 flex items-center gap-1.5">
-                                  {user.name}
-                                  {isSelf && (
-                                    <span className="text-[10px] font-bold px-1.5 py-0.2 bg-violet-500/10 text-violet-400 border border-violet-500/20 rounded">
-                                      Admin
-                                    </span>
-                                  )}
-                                </span>
-                                <span className="block text-xs text-zinc-500 mt-0.5">{user.email}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3.5 text-zinc-400 text-xs">
-                              {new Date(user.createdAt).toLocaleDateString("id-ID", { dateStyle: "medium" })}
-                            </td>
-                            <td className="px-4 py-3.5 text-center text-xs font-semibold text-zinc-300">
-                              {user.conversationCount} chat / {user.messageCount} pesan
-                            </td>
-                            <td className="px-4 py-3.5 text-center">
-                              <span className={`inline-flex items-center justify-center h-6 px-2 text-xs font-bold rounded-full ${
-                                user.sessionCount > 0 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-zinc-800 text-zinc-500"
-                              }`}>
-                                {user.sessionCount}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3.5 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={() => handleForceLogout(user.id)}
-                                  disabled={user.sessionCount === 0 || actionUserId !== null}
-                                  className="inline-flex items-center justify-center p-1.5 text-zinc-400 hover:text-amber-400 hover:bg-zinc-800/80 rounded-lg transition-all disabled:opacity-30 disabled:pointer-events-none"
-                                  title="Force logout dari semua sesi"
-                                >
-                                  <LogOut className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteUser(user.id)}
-                                  disabled={isSelf || actionUserId !== null}
-                                  className="inline-flex items-center justify-center p-1.5 text-zinc-400 hover:text-red-500 hover:bg-zinc-800/80 rounded-lg transition-all disabled:opacity-30 disabled:pointer-events-none"
-                                  title="Hapus user secara permanen"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {filteredUsers.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
-                            Tidak ada pengguna ditemukan.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
+              <SearchInput
+                label="Cari pengguna"
+                placeholder="Cari berdasarkan nama atau email…"
+                value={userSearch}
+                onChange={setUserSearch}
+              />
+              <DataTable<SerializedUser>
+                caption="Daftar pengguna terdaftar"
+                rows={filteredUsers}
+                getRowKey={(u) => u.id}
+                empty={{ icon: Users, title: "Tidak ada pengguna ditemukan", description: "Coba kata kunci pencarian yang berbeda." }}
+                columns={[
+                  {
+                    key: "user",
+                    header: "Pengguna",
+                    render: (u) => {
+                      const isSelf = u.email.toLowerCase() === adminEmail.toLowerCase();
+                      return (
+                        <div>
+                          <span className="flex items-center gap-1.5 font-medium text-foreground">
+                            {u.name || "Tanpa nama"}
+                            {isSelf ? <StatusPill tone="info">Admin</StatusPill> : null}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">{u.email}</span>
+                        </div>
+                      );
+                    },
+                  },
+                  {
+                    key: "createdAt",
+                    header: "Terdaftar",
+                    hideOnMobile: true,
+                    render: (u) => (
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(u.createdAt).toLocaleDateString("id-ID", { dateStyle: "medium" })}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "counts",
+                    header: "Chat / Pesan",
+                    align: "right",
+                    render: (u) => (
+                      <span className="text-xs text-foreground">
+                        {u.conversationCount.toLocaleString("id-ID")} / {u.messageCount.toLocaleString("id-ID")}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "sessions",
+                    header: "Sesi",
+                    align: "center",
+                    render: (u) => (
+                      <StatusPill tone={u.sessionCount > 0 ? "success" : "neutral"}>{u.sessionCount}</StatusPill>
+                    ),
+                  },
+                  {
+                    key: "actions",
+                    header: "Aksi",
+                    align: "right",
+                    render: (u) => {
+                      const isSelf = u.email.toLowerCase() === adminEmail.toLowerCase();
+                      return (
+                        <div className="flex items-center justify-end gap-1">
+                          <IconButton
+                            label="Keluarkan paksa dari semua sesi"
+                            tone="warning"
+                            disabled={u.sessionCount === 0 || actionUserId !== null}
+                            onClick={() => handleForceLogout(u.id)}
+                          >
+                            <LogOut className="h-4 w-4" aria-hidden />
+                          </IconButton>
+                          <IconButton
+                            label="Hapus user permanen"
+                            tone="danger"
+                            disabled={isSelf || actionUserId !== null}
+                            onClick={() => handleDeleteUser(u.id)}
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden />
+                          </IconButton>
+                        </div>
+                      );
+                    },
+                  },
+                ]}
+              />
             </div>
           )}
 
-          {/* TAB CONTENT: CONVERSATION AUDIT */}
+          {/* AUDIT */}
           {activeTab === "audit" && (
             <div className="space-y-4">
-              
-              {/* Search Control */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                <input
-                  type="text"
-                  placeholder="Cari percakapan berdasarkan judul, nama pemilik, atau email..."
-                  value={convoSearch}
-                  onChange={e => setConvoSearch(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900/40 py-2.5 pl-10 pr-4 text-sm text-white placeholder-zinc-500 outline-none transition focus:border-violet-500"
-                />
-              </div>
-
-              {/* Conversations Table */}
-              <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/10 backdrop-blur-md">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm text-zinc-300">
-                    <thead className="border-b border-zinc-800 bg-zinc-950/40 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                      <tr>
-                        <th className="px-4 py-3">Judul Percakapan & Pemilik</th>
-                        <th className="px-4 py-3 text-center">Jumlah Pesan</th>
-                        <th className="px-4 py-3">Status Berbagi</th>
-                        <th className="px-4 py-3">Terakhir Diperbarui</th>
-                        <th className="px-4 py-3 text-right">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-800/60 bg-zinc-900/10">
-                      {filteredConversations.map(convo => (
-                        <tr key={convo.id} className="hover:bg-zinc-800/20 transition-colors">
-                          <td className="px-4 py-3.5">
-                            <div>
-                              <span className="font-semibold text-zinc-100 block truncate max-w-xs sm:max-w-md">
-                                {convo.title}
-                              </span>
-                              <span className="block text-xs text-zinc-500 mt-0.5">
-                                Oleh: <span className="text-zinc-400 font-medium">{convo.userName}</span> ({convo.userEmail})
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3.5 text-center text-xs font-semibold text-zinc-300">
-                            {convo.messageCount} pesan
-                          </td>
-                          <td className="px-4 py-3.5">
-                            {convo.isShared ? (
-                              <div className="flex flex-col gap-1">
-                                <span className="inline-flex w-fit items-center gap-1 text-[11px] font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full">
-                                  <Share2 className="h-2.5 w-2.5" />
-                                  <span>Publik</span>
-                                </span>
-                                {convo.shareId && (
-                                  <Link
-                                    href={`/share/${convo.shareId}`}
-                                    target="_blank"
-                                    className="text-[10px] text-zinc-500 hover:text-violet-400 transition underline truncate max-w-[120px]"
-                                  >
-                                    Buka link share
-                                  </Link>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="inline-flex items-center text-[11px] font-bold px-2 py-0.5 bg-zinc-800 text-zinc-500 border border-transparent rounded-full">
-                                Privat
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5 text-zinc-400 text-xs">
-                            {new Date(convo.updatedAt).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
-                          </td>
-                          <td className="px-4 py-3.5 text-right">
-                            {convo.isShared && (
-                              <button
-                                onClick={() => handleUnshare(convo.id)}
-                                disabled={actionConvoId !== null}
-                                className="inline-flex items-center gap-1 text-xs font-semibold text-zinc-300 hover:text-red-400 hover:bg-red-500/10 border border-zinc-800 hover:border-red-500/20 px-2.5 py-1 rounded-lg transition-all"
-                              >
-                                <span>Unshare</span>
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                      {filteredConversations.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
-                            Tidak ada percakapan ditemukan.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
+              <SearchInput
+                label="Cari percakapan"
+                placeholder="Cari berdasarkan judul, nama, atau email pemilik…"
+                value={convoSearch}
+                onChange={setConvoSearch}
+              />
+              <DataTable<SerializedConversation>
+                caption="Daftar percakapan untuk audit"
+                rows={filteredConversations}
+                getRowKey={(c) => c.id}
+                empty={{ icon: MessageSquare, title: "Tidak ada percakapan ditemukan", description: "Coba kata kunci pencarian yang berbeda." }}
+                columns={[
+                  {
+                    key: "title",
+                    header: "Percakapan & Pemilik",
+                    render: (c) => (
+                      <div>
+                        <span className="block max-w-xs truncate font-medium text-foreground sm:max-w-md">{c.title}</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {c.userName} · {c.userEmail}
+                        </span>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "messages",
+                    header: "Pesan",
+                    align: "right",
+                    render: (c) => <span className="text-xs text-foreground">{c.messageCount.toLocaleString("id-ID")}</span>,
+                  },
+                  {
+                    key: "status",
+                    header: "Status Berbagi",
+                    render: (c) =>
+                      c.isShared ? (
+                        <div className="flex flex-col items-start gap-1">
+                          <StatusPill tone="success" dot>
+                            <Share2 className="h-3 w-3" aria-hidden /> Publik
+                          </StatusPill>
+                          {c.shareId ? (
+                            <Link
+                              href={`/share/${c.shareId}`}
+                              target="_blank"
+                              className="inline-flex items-center gap-1 text-[11px] text-primary underline-offset-2 hover:underline"
+                            >
+                              <ExternalLink className="h-3 w-3" aria-hidden /> Buka tautan
+                            </Link>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <StatusPill tone="neutral">Privat</StatusPill>
+                      ),
+                  },
+                  {
+                    key: "updatedAt",
+                    header: "Diperbarui",
+                    hideOnMobile: true,
+                    render: (c) => (
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(c.updatedAt).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "actions",
+                    header: "Aksi",
+                    align: "right",
+                    render: (c) =>
+                      c.isShared ? (
+                        <Button variant="danger" size="sm" disabled={actionConvoId !== null} onClick={() => handleUnshare(c.id)}>
+                          Unshare
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ),
+                  },
+                ]}
+              />
             </div>
           )}
 
-          {/* TAB CONTENT: SYSTEM SETTINGS */}
+          {/* ACTIVITY */}
+          {activeTab === "activity" && (
+            <div className="space-y-4">
+              <SearchInput
+                label="Cari log aktivitas"
+                placeholder="Cari berdasarkan tipe, nama, email, atau metadata…"
+                value={adminActivitySearch}
+                onChange={setAdminActivitySearch}
+              />
+              <DataTable<AdminActivity>
+                caption="Log aktivitas global"
+                rows={filteredAdminActivities}
+                getRowKey={(a) => a.id}
+                isLoading={loadingAdminActivities}
+                error={adminActivityError}
+                onRetry={fetchAdminActivities}
+                empty={{ icon: Clock, title: "Tidak ada log aktivitas", description: "Aktivitas pengguna akan muncul di sini." }}
+                columns={[
+                  {
+                    key: "time",
+                    header: "Waktu",
+                    hideOnMobile: true,
+                    render: (a) => (
+                      <span className="whitespace-nowrap text-xs text-muted-foreground">
+                        {new Date(a.createdAt).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "user",
+                    header: "Pengguna",
+                    render: (a) => (
+                      <div>
+                        <span className="block max-w-[180px] truncate font-medium text-foreground">
+                          {a.userName || "Tamu / belum login"}
+                        </span>
+                        {a.userEmail ? (
+                          <span className="block max-w-[180px] truncate text-[11px] text-muted-foreground">{a.userEmail}</span>
+                        ) : null}
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "type",
+                    header: "Aktivitas",
+                    render: (a) => {
+                      const m = ACTIVITY_META[a.type] ?? { label: a.type, tone: "neutral" as PillTone };
+                      return <StatusPill tone={m.tone}>{m.label}</StatusPill>;
+                    },
+                  },
+                  {
+                    key: "detail",
+                    header: "Detail",
+                    render: (a) => (
+                      <span className="block max-w-xs truncate text-xs text-muted-foreground">{activityDetail(a) || "—"}</span>
+                    ),
+                  },
+                ]}
+              />
+            </div>
+          )}
+
+          {/* USAGE */}
+          {activeTab === "usage" && (
+            <div className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <StatCard
+                  label="Token Hari Ini"
+                  value={usageStats.todayTokens.total.toLocaleString("id-ID")}
+                  icon={BarChart3}
+                  hint={`In ${usageStats.todayTokens.input.toLocaleString("id-ID")} · Out ${usageStats.todayTokens.output.toLocaleString("id-ID")}`}
+                />
+                <StatCard
+                  label="Token Kumulatif"
+                  value={usageStats.allTimeTokens.total.toLocaleString("id-ID")}
+                  icon={Database}
+                  hint={`In ${usageStats.allTimeTokens.input.toLocaleString("id-ID")} · Out ${usageStats.allTimeTokens.output.toLocaleString("id-ID")}`}
+                />
+                <StatCard
+                  label="Estimasi Biaya Hari Ini"
+                  value={`$${estimatedCost.toFixed(5)}`}
+                  icon={Gauge}
+                  hint="Estimasi tarif Gemini Flash"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <SectionHeading title="Konsumsi Pengguna Hari Ini" />
+                <DataTable<UsageStats["byUserToday"][number]>
+                  caption="Konsumsi token per pengguna hari ini"
+                  rows={usageStats.byUserToday}
+                  getRowKey={(item) => item.userId}
+                  empty={{ icon: BarChart3, title: "Belum ada penggunaan hari ini", description: "Statistik akan muncul setelah pengguna mulai mengobrol." }}
+                  columns={[
+                    {
+                      key: "user",
+                      header: "Pengguna",
+                      render: (item) => {
+                        const user = users.find((u) => u.id === item.userId);
+                        return (
+                          <div>
+                            <span className="block font-medium text-foreground">{user?.name || "Pengguna tidak dikenal"}</span>
+                            <span className="block text-xs text-muted-foreground">{user?.email || item.userId}</span>
+                          </div>
+                        );
+                      },
+                    },
+                    { key: "messages", header: "Pesan", align: "right", render: (item) => <span className="text-xs">{item.messageCount.toLocaleString("id-ID")}</span> },
+                    { key: "in", header: "Token In", align: "right", hideOnMobile: true, render: (item) => <span className="text-xs text-muted-foreground">{item.inputTokens.toLocaleString("id-ID")}</span> },
+                    { key: "out", header: "Token Out", align: "right", hideOnMobile: true, render: (item) => <span className="text-xs text-muted-foreground">{item.outputTokens.toLocaleString("id-ID")}</span> },
+                    { key: "total", header: "Total", align: "right", render: (item) => <span className="text-xs font-semibold text-foreground">{item.totalTokens.toLocaleString("id-ID")}</span> },
+                    {
+                      key: "quota",
+                      header: "Kuota Harian",
+                      align: "right",
+                      render: (item) => {
+                        const pct = Math.min(100, Math.round((item.messageCount / settings.maxMessagesPerUserPerDay) * 100));
+                        const barColor = pct > 90 ? "bg-destructive" : pct > 70 ? "bg-[#9a6700]" : "bg-primary";
+                        return (
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="text-[11px] font-medium text-foreground tabular-nums">
+                              {item.messageCount}/{settings.maxMessagesPerUserPerDay} ({pct}%)
+                            </span>
+                            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted2" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+                              <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      },
+                    },
+                  ]}
+                />
+              </div>
+
+              <div className="space-y-3">
+                <SectionHeading title="Log Penggunaan Terbaru" />
+                <DataTable<UsageStats["todayEvents"][number]>
+                  caption="Log penggunaan token terbaru hari ini"
+                  rows={usageStats.todayEvents}
+                  getRowKey={(e) => e.id}
+                  empty={{ icon: Clock, title: "Belum ada log hari ini" }}
+                  columns={[
+                    { key: "time", header: "Waktu", render: (e) => <span className="text-xs text-muted-foreground">{new Date(e.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span> },
+                    {
+                      key: "user",
+                      header: "User",
+                      render: (e) => {
+                        const user = users.find((u) => u.id === e.userId);
+                        return (
+                          <div>
+                            <span className="block max-w-[150px] truncate font-medium text-foreground">{user?.name || "Tidak dikenal"}</span>
+                            <span className="block max-w-[150px] truncate text-[11px] text-muted-foreground">{user?.email || e.userId}</span>
+                          </div>
+                        );
+                      },
+                    },
+                    { key: "model", header: "Model", hideOnMobile: true, render: (e) => <span className="text-xs text-foreground">{getModelLabel(e.model || "") || e.model || "—"}</span> },
+                    { key: "in", header: "Input", align: "right", hideOnMobile: true, render: (e) => <span className="text-xs text-muted-foreground">{e.inputTokens.toLocaleString("id-ID")}</span> },
+                    { key: "out", header: "Output", align: "right", hideOnMobile: true, render: (e) => <span className="text-xs text-muted-foreground">{e.outputTokens.toLocaleString("id-ID")}</span> },
+                    { key: "total", header: "Total", align: "right", render: (e) => <span className="text-xs font-semibold text-foreground">{(e.inputTokens + e.outputTokens).toLocaleString("id-ID")}</span> },
+                  ]}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* KNOWLEDGE BASE */}
+          {activeTab === "knowledge" && (
+            <div className="space-y-4">
+              <SearchInput
+                label="Cari pengetahuan"
+                placeholder="Cari judul, isi, tag, atau pemilik…"
+                value={knowledgeSearch}
+                onChange={setKnowledgeSearch}
+              />
+              <DataTable<AdminKnowledgeEntry>
+                caption="Knowledge base semua pengguna"
+                rows={filteredKnowledge}
+                getRowKey={(e) => e.id}
+                isLoading={loadingKnowledge}
+                error={knowledgeError}
+                onRetry={fetchKnowledge}
+                empty={{ icon: BookOpen, title: "Belum ada pengetahuan", description: "Entri yang disimpan pengguna akan muncul di sini." }}
+                columns={[
+                  {
+                    key: "title",
+                    header: "Judul & Ringkasan",
+                    render: (e) => (
+                      <div className="max-w-md">
+                        <span className="block truncate font-medium text-foreground">{e.title}</span>
+                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{e.contentPreview}</span>
+                        {e.tags ? (
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {e.tags
+                              .split(",")
+                              .map((t) => t.trim())
+                              .filter(Boolean)
+                              .slice(0, 4)
+                              .map((tag) => (
+                                <span key={tag} className="rounded-full bg-muted2 px-2 py-0.5 text-[10px] text-muted-foreground">
+                                  {tag}
+                                </span>
+                              ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "owner",
+                    header: "Pemilik",
+                    hideOnMobile: true,
+                    render: (e) =>
+                      e.isGlobal ? (
+                        <StatusPill tone="info">Global</StatusPill>
+                      ) : (
+                        <div>
+                          <span className="block text-sm text-foreground">{e.userName || "—"}</span>
+                          <span className="block text-xs text-muted-foreground">{e.userEmail ?? "—"}</span>
+                        </div>
+                      ),
+                  },
+                  {
+                    key: "chars",
+                    header: "Karakter",
+                    align: "right",
+                    hideOnMobile: true,
+                    render: (e) => <span className="text-xs text-muted-foreground">{e.contentLength.toLocaleString("id-ID")}</span>,
+                  },
+                  {
+                    key: "status",
+                    header: "Status",
+                    align: "center",
+                    render: (e) => (
+                      <div className="flex items-center justify-center gap-2">
+                        <Toggle
+                          label={`Aktifkan pengetahuan ${e.title}`}
+                          checked={e.enabled}
+                          disabled={actionKnowledgeId !== null}
+                          onChange={(v) => handleToggleKnowledge(e.id, v)}
+                        />
+                        <StatusPill tone={e.enabled ? "success" : "neutral"}>{e.enabled ? "Aktif" : "Nonaktif"}</StatusPill>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "updated",
+                    header: "Diperbarui",
+                    hideOnMobile: true,
+                    render: (e) => (
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(e.updatedAt).toLocaleDateString("id-ID", { dateStyle: "medium" })}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "actions",
+                    header: "Aksi",
+                    align: "right",
+                    render: (e) => (
+                      <div className="flex items-center justify-end gap-1">
+                        <IconButton
+                          label="Edit pengetahuan"
+                          disabled={actionKnowledgeId !== null}
+                          onClick={() => openEditKnowledge(e)}
+                        >
+                          <Pencil className="h-4 w-4" aria-hidden />
+                        </IconButton>
+                        <IconButton
+                          label="Hapus pengetahuan"
+                          tone="danger"
+                          disabled={actionKnowledgeId !== null}
+                          onClick={() => handleDeleteKnowledge(e.id)}
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden />
+                        </IconButton>
+                      </div>
+                    ),
+                  },
+                ]}
+              />
+            </div>
+          )}
+
+          {/* SETTINGS */}
           {activeTab === "settings" && (
-            <form onSubmit={handleSaveSettings} className="rounded-xl border border-zinc-800 bg-zinc-900/10 backdrop-blur-md p-6 space-y-6 relative overflow-hidden">
-              <BorderBeam size={120} duration={12} borderWidth={1} colorFrom="#7c3aed" colorTo="#fbbf24" />
-              
-              <div className="grid gap-6 md:grid-cols-2">
-                
-                {/* AI Configuration */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-violet-400 uppercase tracking-wider">AI Defaults</h3>
-                  
-                  <label className="block space-y-1.5">
-                    <span className="text-xs font-semibold text-zinc-400">Default Model</span>
-                    <select
-                      value={settings.defaultModel}
-                      onChange={e => setSettings(prev => ({ ...prev, defaultModel: e.target.value }))}
-                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3.5 py-2.5 text-sm text-white outline-none focus:border-violet-500 transition"
-                    >
-                      {MODEL_OPTIONS.map(model => (
-                        <option key={model} value={model}>
-                          {getModelLabel(model) || model}
-                        </option>
+            <form onSubmit={handleSaveSettings} className="space-y-6">
+              <div className="grid gap-6 lg:grid-cols-2">
+                {/* AI Defaults */}
+                <Card className="space-y-5 p-6">
+                  <SectionHeading title="Default AI" description="Model dan parameter dasar untuk semua pengguna." />
+                  <Field label="Model Default" htmlFor="set-model">
+                    <Select id="set-model" value={settings.defaultModel} onChange={(e) => setSettings((p) => ({ ...p, defaultModel: e.target.value }))}>
+                      {MODEL_OPTIONS.map((m) => (
+                        <option key={m} value={m}>{getModelLabel(m) || m}</option>
                       ))}
-                    </select>
-                  </label>
-
-                  <label className="block space-y-1.5">
-                    <span className="text-xs font-semibold text-zinc-400">Temperature ({settings.defaultTemperature})</span>
+                    </Select>
+                  </Field>
+                  <Field label={`Temperature — ${settings.defaultTemperature.toFixed(1)}`} htmlFor="set-temp" hint="0 = deterministik, 2 = paling kreatif.">
                     <input
+                      id="set-temp"
                       type="range"
-                      min="0"
-                      max="2"
-                      step="0.1"
+                      min={0}
+                      max={2}
+                      step={0.1}
                       value={settings.defaultTemperature}
-                      onChange={e => setSettings(prev => ({ ...prev, defaultTemperature: Number(e.target.value) }))}
-                      className="w-full accent-violet-600 bg-zinc-950/60 rounded-xl"
+                      onChange={(e) => setSettings((p) => ({ ...p, defaultTemperature: Number(e.target.value) }))}
+                      className="w-full accent-primary"
                     />
-                  </label>
-                </div>
+                  </Field>
+                </Card>
 
-                {/* Policies & Limits */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-violet-400 uppercase tracking-wider">Kebijakan & Quota</h3>
-                  
+                {/* Policies & Quota */}
+                <Card className="space-y-5 p-6">
+                  <SectionHeading title="Kebijakan & Kuota" description="Batasan penggunaan tingkat sistem." />
                   <div className="grid grid-cols-2 gap-4">
-                    <label className="block space-y-1.5">
-                      <span className="text-xs font-semibold text-zinc-400">Max Pesan per Chat</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max="1000"
-                        value={settings.maxMessagesPerChat}
-                        onChange={e => setSettings(prev => ({ ...prev, maxMessagesPerChat: parseInt(e.target.value) || 100 }))}
-                        className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3.5 py-2 text-sm text-white outline-none focus:border-violet-500 transition"
-                      />
-                    </label>
-
-                    <label className="block space-y-1.5">
-                      <span className="text-xs font-semibold text-zinc-400">Max Karakter Prompt</span>
-                      <input
-                        type="number"
-                        min="10"
-                        max="100000"
-                        value={settings.maxPromptLength}
-                        onChange={e => setSettings(prev => ({ ...prev, maxPromptLength: parseInt(e.target.value) || 4000 }))}
-                        className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3.5 py-2 text-sm text-white outline-none focus:border-violet-500 transition"
-                      />
-                    </label>
+                    <Field label="Max pesan / chat" htmlFor="set-mmc">
+                      <NumberInput id="set-mmc" min={1} max={1000} value={settings.maxMessagesPerChat} onChange={(e) => setSettings((p) => ({ ...p, maxMessagesPerChat: parseInt(e.target.value) || 100 }))} />
+                    </Field>
+                    <Field label="Max karakter prompt" htmlFor="set-mpl">
+                      <NumberInput id="set-mpl" min={10} max={100000} value={settings.maxPromptLength} onChange={(e) => setSettings((p) => ({ ...p, maxPromptLength: parseInt(e.target.value) || 4000 }))} />
+                    </Field>
+                    <Field label="Max pesan / user / hari" htmlFor="set-mmu">
+                      <NumberInput id="set-mmu" min={1} max={10000} value={settings.maxMessagesPerUserPerDay} onChange={(e) => setSettings((p) => ({ ...p, maxMessagesPerUserPerDay: parseInt(e.target.value) || 50 }))} />
+                    </Field>
+                    <Field label="Rate limit / menit" htmlFor="set-rl">
+                      <NumberInput id="set-rl" min={1} max={1000} value={settings.rateLimitMessagesPerMinute} onChange={(e) => setSettings((p) => ({ ...p, rateLimitMessagesPerMinute: parseInt(e.target.value) || 10 }))} />
+                    </Field>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4 pt-1">
-                    <label className="block space-y-1.5">
-                      <span className="text-xs font-semibold text-zinc-400">Max Pesan per User per Hari</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max="10000"
-                        value={settings.maxMessagesPerUserPerDay}
-                        onChange={e => setSettings(prev => ({ ...prev, maxMessagesPerUserPerDay: parseInt(e.target.value) || 50 }))}
-                        className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3.5 py-2.5 text-sm text-white outline-none focus:border-violet-500 transition"
-                      />
-                    </label>
-
-                    <label className="block space-y-1.5">
-                      <span className="text-xs font-semibold text-zinc-400">Rate Limit per Menit</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max="1000"
-                        value={settings.rateLimitMessagesPerMinute}
-                        onChange={e => setSettings(prev => ({ ...prev, rateLimitMessagesPerMinute: parseInt(e.target.value) || 10 }))}
-                        className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3.5 py-2.5 text-sm text-white outline-none focus:border-violet-500 transition"
-                      />
-                    </label>
+                  <div className="divide-y divide-border border-t border-border">
+                    <SettingRow
+                      title="Izinkan pendaftaran baru"
+                      description="Jika mati, pengguna baru tidak bisa registrasi."
+                      checked={settings.registrationEnabled}
+                      onChange={(v) => setSettings((p) => ({ ...p, registrationEnabled: v }))}
+                    />
+                    <SettingRow
+                      title="Izinkan berbagi percakapan"
+                      description="Jika mati, tombol bagikan publik disembunyikan."
+                      checked={settings.sharingEnabled}
+                      onChange={(v) => setSettings((p) => ({ ...p, sharingEnabled: v }))}
+                    />
                   </div>
-
-                  <div className="pt-2 space-y-3">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.registrationEnabled}
-                        onChange={e => setSettings(prev => ({ ...prev, registrationEnabled: e.target.checked }))}
-                        className="h-4.5 w-4.5 rounded border-zinc-800 text-violet-600 bg-zinc-950/60 accent-violet-600 focus:ring-0"
-                      />
-                      <div>
-                        <span className="text-sm font-semibold text-zinc-200">Izinkan Pendaftaran Pengguna Baru</span>
-                        <p className="text-[11px] text-zinc-500">Jika mati, user baru tidak bisa melakukan register</p>
-                      </div>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.sharingEnabled}
-                        onChange={e => setSettings(prev => ({ ...prev, sharingEnabled: e.target.checked }))}
-                        className="h-4.5 w-4.5 rounded border-zinc-800 text-violet-600 bg-zinc-950/60 accent-violet-600 focus:ring-0"
-                      />
-                      <div>
-                        <span className="text-sm font-semibold text-zinc-200">Izinkan Fitur Sharing Percakapan</span>
-                        <p className="text-[11px] text-zinc-500">Jika mati, chat row tidak memiliki tombol bagikan publik</p>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
+                </Card>
               </div>
 
-              <div className="space-y-4 pt-4 border-t border-zinc-800/80">
-                <label className="block space-y-1.5">
-                  <span className="text-xs font-semibold text-zinc-400">Global System Prompt</span>
-                  <textarea
-                    value={settings.defaultSystemPrompt}
-                    onChange={e => setSettings(prev => ({ ...prev, defaultSystemPrompt: e.target.value }))}
-                    rows={4}
-                    className="w-full resize-y rounded-xl border border-zinc-800 bg-zinc-950/60 px-3.5 py-2.5 text-sm text-white outline-none focus:border-violet-500 transition"
-                    placeholder="Contoh: You are a helpful personal AI assistant..."
-                  />
-                </label>
+              {/* AI Tools & Guardrails (NEW) */}
+              <Card className="space-y-5 p-6">
+                <SectionHeading
+                  title="AI Tools & Guardrails"
+                  description="Kontrol fungsi yang boleh dipanggil AI secara otomatis, dan pasang pengaman."
+                />
 
-                <div className="flex items-center gap-4">
-                  <button
-                    type="submit"
-                    disabled={isSavingSettings}
-                    className="rounded-xl bg-violet-600 hover:bg-violet-500 text-sm font-bold text-white px-5 py-2.5 transition disabled:opacity-50"
-                  >
-                    {isSavingSettings ? "Menyimpan..." : "Simpan Setelan Global"}
-                  </button>
-                  {settingsStatus && (
-                    <div className={`flex items-center gap-1.5 text-xs font-semibold ${
-                      settingsStatus.type === "success" ? "text-emerald-400" : "text-red-400"
-                    }`}>
-                      {settingsStatus.type === "success" ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-                      <span>{settingsStatus.message}</span>
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Wrench className="h-4 w-4 text-primary" aria-hidden />
+                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tools</span>
                     </div>
-                  )}
+                    <div className="mt-1 divide-y divide-border">
+                      <SettingRow
+                        title="Aktifkan AI Tools (master)"
+                        description="Saklar utama. Jika mati, AI tidak memanggil fungsi apa pun."
+                        checked={settings.toolsEnabled}
+                        onChange={(v) => setSettings((p) => ({ ...p, toolsEnabled: v }))}
+                      />
+                      <SettingRow
+                        title="Generate Gambar"
+                        description="Izinkan AI memanggil generate_image saat diminta gambar."
+                        checked={settings.imageToolEnabled}
+                        onChange={(v) => setSettings((p) => ({ ...p, imageToolEnabled: v }))}
+                        disabled={!settings.toolsEnabled}
+                      />
+                      <SettingRow
+                        title="Cari Knowledge Base"
+                        description="Izinkan AI mencari basis pengetahuan pengguna."
+                        checked={settings.knowledgeToolEnabled}
+                        onChange={(v) => setSettings((p) => ({ ...p, knowledgeToolEnabled: v }))}
+                        disabled={!settings.toolsEnabled}
+                      />
+                      <SettingRow
+                        title="Simpan Memory"
+                        description="Izinkan AI menyimpan fakta jangka panjang pengguna."
+                        checked={settings.memoryToolEnabled}
+                        onChange={(v) => setSettings((p) => ({ ...p, memoryToolEnabled: v }))}
+                        disabled={!settings.toolsEnabled}
+                      />
+                    </div>
+                    <div className="mt-4">
+                      <Field label="Maks. pemanggilan tool / pesan" htmlFor="set-mtc" hint="Batas anti-loop untuk setiap pesan (0–20).">
+                        <NumberInput
+                          id="set-mtc"
+                          min={0}
+                          max={20}
+                          value={settings.maxToolCallsPerMessage}
+                          onChange={(e) => setSettings((p) => ({ ...p, maxToolCallsPerMessage: Math.max(0, Math.min(20, parseInt(e.target.value) || 0)) }))}
+                          disabled={!settings.toolsEnabled}
+                        />
+                      </Field>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-muted2 px-2.5 py-0.5 text-[11px] text-muted-foreground"><ImageIcon className="h-3 w-3" aria-hidden /> generate_image</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-muted2 px-2.5 py-0.5 text-[11px] text-muted-foreground"><BookOpen className="h-3 w-3" aria-hidden /> search_knowledge</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-muted2 px-2.5 py-0.5 text-[11px] text-muted-foreground"><Brain className="h-3 w-3" aria-hidden /> save_memory</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-primary" aria-hidden />
+                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Guardrails</span>
+                    </div>
+                    <div className="mt-1 divide-y divide-border">
+                      <SettingRow
+                        title="Aktifkan Guardrails"
+                        description="Saring input pengguna terhadap daftar kata terblokir."
+                        checked={settings.guardrailsEnabled}
+                        onChange={(v) => setSettings((p) => ({ ...p, guardrailsEnabled: v }))}
+                      />
+                    </div>
+                    <div className="mt-4">
+                      <Field
+                        label="Kata/frasa terblokir"
+                        htmlFor="set-blocked"
+                        hint="Pisahkan dengan koma. Pesan yang mengandung salah satunya akan ditolak."
+                      >
+                        <Textarea
+                          id="set-blocked"
+                          rows={5}
+                          value={settings.blockedKeywords ?? ""}
+                          onChange={(e) => setSettings((p) => ({ ...p, blockedKeywords: e.target.value }))}
+                          placeholder="mis. kata1, frasa terlarang, kata2"
+                          disabled={!settings.guardrailsEnabled}
+                        />
+                      </Field>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </Card>
+
+              {/* Global system prompt + save */}
+              <Card className="space-y-5 p-6">
+                <SectionHeading title="System Prompt Global" description="Instruksi dasar yang dipakai bila pengguna tidak menyetel sendiri." />
+                <Field label="Global System Prompt" htmlFor="set-sysprompt">
+                  <Textarea
+                    id="set-sysprompt"
+                    rows={4}
+                    value={settings.defaultSystemPrompt}
+                    onChange={(e) => setSettings((p) => ({ ...p, defaultSystemPrompt: e.target.value }))}
+                    placeholder="Contoh: You are a helpful personal AI assistant…"
+                  />
+                </Field>
+                <div className="flex justify-end">
+                  <Button type="submit" variant="primary" disabled={isSavingSettings}>
+                    {isSavingSettings ? "Menyimpan…" : "Simpan Setelan Global"}
+                  </Button>
+                </div>
+              </Card>
             </form>
           )}
 
-          {/* TAB CONTENT: STATISTIK PENGGUNAAN */}
-          {activeTab === "usage" && (
-            <div className="space-y-6">
-              {/* Token Usage Stats Grid */}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/20 backdrop-blur-md p-6 flex items-start justify-between relative overflow-hidden">
-                  <div className="space-y-2">
-                    <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Token Hari Ini</span>
-                    <p className="text-3xl font-extrabold text-white tracking-tight">
-                      {usageStats.todayTokens.total.toLocaleString("id-ID")}
-                    </p>
-                    <span className="text-[11px] text-zinc-400 block font-medium">
-                      Input: {usageStats.todayTokens.input.toLocaleString("id-ID")} | Output: {usageStats.todayTokens.output.toLocaleString("id-ID")}
-                    </span>
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-950/80 border border-zinc-800">
-                    <BarChart3 className="h-5 w-5 text-violet-400" />
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/20 backdrop-blur-md p-6 flex items-start justify-between relative overflow-hidden">
-                  <div className="space-y-2">
-                    <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Token Kumulatif (All-Time)</span>
-                    <p className="text-3xl font-extrabold text-white tracking-tight">
-                      {usageStats.allTimeTokens.total.toLocaleString("id-ID")}
-                    </p>
-                    <span className="text-[11px] text-zinc-400 block font-medium">
-                      Input: {usageStats.allTimeTokens.input.toLocaleString("id-ID")} | Output: {usageStats.allTimeTokens.output.toLocaleString("id-ID")}
-                    </span>
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-950/80 border border-zinc-800">
-                    <BarChart3 className="h-5 w-5 text-blue-400" />
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/20 backdrop-blur-md p-6 flex items-start justify-between relative overflow-hidden">
-                  <div className="space-y-2">
-                    <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Estimasi Biaya Hari Ini</span>
-                    <p className="text-3xl font-extrabold text-emerald-400 tracking-tight">
-                      ${((usageStats.todayTokens.input * 0.075 / 1000000) + (usageStats.todayTokens.output * 0.3 / 1000000)).toFixed(5)}
-                    </p>
-                    <span className="text-[11px] text-zinc-400 block font-medium">
-                      Berdasarkan tarif Gemini 2.5 Flash
-                    </span>
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-950/80 border border-zinc-800">
-                    <Database className="h-5 w-5 text-emerald-400" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Usage per User Table */}
-              <div className="space-y-4">
-                <h3 className="text-base font-bold text-white uppercase tracking-wider">Konsumsi Pengguna Hari Ini</h3>
-                <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/10 backdrop-blur-md">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm text-zinc-300">
-                      <thead className="border-b border-zinc-800 bg-zinc-950/40 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                        <tr>
-                          <th className="px-4 py-3">Pengguna</th>
-                          <th className="px-4 py-3 text-center">Jumlah Pesan</th>
-                          <th className="px-4 py-3 text-center">Token Input</th>
-                          <th className="px-4 py-3 text-center">Token Output</th>
-                          <th className="px-4 py-3 text-center">Total Token</th>
-                          <th className="px-4 py-3 text-right">Kuota Pesan Harian</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-800/60 bg-zinc-900/10">
-                        {usageStats.byUserToday.map(item => {
-                          const user = users.find(u => u.id === item.userId);
-                          const percentage = Math.min(100, Math.round((item.messageCount / settings.maxMessagesPerUserPerDay) * 100));
-                          return (
-                            <tr key={item.userId} className="hover:bg-zinc-800/20 transition-colors">
-                              <td className="px-4 py-3.5">
-                                <div>
-                                  <span className="font-semibold text-zinc-100 block">
-                                    {user?.name || "Unknown User"}
-                                  </span>
-                                  <span className="block text-xs text-zinc-500 mt-0.5">
-                                    {user?.email || item.userId}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="px-4 py-3.5 text-center font-medium text-zinc-200">
-                                {item.messageCount} pesan
-                              </td>
-                              <td className="px-4 py-3.5 text-center text-zinc-400 text-xs">
-                                {item.inputTokens.toLocaleString("id-ID")}
-                              </td>
-                              <td className="px-4 py-3.5 text-center text-zinc-400 text-xs">
-                                {item.outputTokens.toLocaleString("id-ID")}
-                              </td>
-                              <td className="px-4 py-3.5 text-center text-violet-400 font-semibold">
-                                {item.totalTokens.toLocaleString("id-ID")}
-                              </td>
-                              <td className="px-4 py-3.5 text-right">
-                                <div className="flex flex-col items-end gap-1">
-                                  <span className="text-xs font-semibold text-zinc-300">
-                                    {item.messageCount} / {settings.maxMessagesPerUserPerDay} ({percentage}%)
-                                  </span>
-                                  <div className="w-24 bg-zinc-850 border border-zinc-800 rounded-full h-1.5 overflow-hidden">
-                                    <div 
-                                      className={`h-full rounded-full ${
-                                        percentage > 90 ? "bg-red-500" : percentage > 70 ? "bg-amber-500" : "bg-violet-500"
-                                      }`}
-                                      style={{ width: `${percentage}%` }}
-                                    ></div>
-                                  </div>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {usageStats.byUserToday.length === 0 && (
-                          <tr>
-                            <td colSpan={6} className="px-4 py-8 text-center text-zinc-500">
-                              Belum ada aktivitas penggunaan hari ini.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-
-              {/* Recent Usage Logs */}
-              <div className="space-y-4">
-                <h3 className="text-base font-bold text-white uppercase tracking-wider">Log Penggunaan Terbaru (Hari Ini)</h3>
-                <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/10 backdrop-blur-md">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm text-zinc-300">
-                      <thead className="border-b border-zinc-800 bg-zinc-950/40 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                        <tr>
-                          <th className="px-4 py-3">Waktu</th>
-                          <th className="px-4 py-3">User</th>
-                          <th className="px-4 py-3">Model</th>
-                          <th className="px-4 py-3 text-center">Token Input</th>
-                          <th className="px-4 py-3 text-center">Token Output</th>
-                          <th className="px-4 py-3 text-right">Total Token</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-800/60 bg-zinc-900/10">
-                        {usageStats.todayEvents.map(event => {
-                          const user = users.find(u => u.id === event.userId);
-                          return (
-                            <tr key={event.id} className="hover:bg-zinc-800/20 transition-colors">
-                              <td className="px-4 py-3 text-zinc-400 text-xs">
-                                {new Date(event.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                              </td>
-                              <td className="px-4 py-3">
-                                <div>
-                                  <span className="font-semibold text-zinc-200 block truncate max-w-[150px]">
-                                    {user?.name || "Unknown User"}
-                                  </span>
-                                  <span className="block text-[10px] text-zinc-500 truncate max-w-[150px]">
-                                    {user?.email || event.userId}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 text-zinc-300 text-xs">
-                                {getModelLabel(event.model || "") || event.model}
-                              </td>
-                              <td className="px-4 py-3 text-center text-zinc-400 text-xs">
-                                {event.inputTokens.toLocaleString("id-ID")}
-                              </td>
-                              <td className="px-4 py-3 text-center text-zinc-400 text-xs">
-                                {event.outputTokens.toLocaleString("id-ID")}
-                              </td>
-                              <td className="px-4 py-3 text-right text-violet-400 font-semibold">
-                                {(event.inputTokens + event.outputTokens).toLocaleString("id-ID")}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {usageStats.todayEvents.length === 0 && (
-                          <tr>
-                            <td colSpan={6} className="px-4 py-8 text-center text-zinc-500">
-                              Tidak ada log penggunaan terbaru hari ini.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB CONTENT: MAINTENANCE */}
+          {/* MAINTENANCE */}
           {activeTab === "maintenance" && (
-            <div className="space-y-6">
-              
-              <div className="grid gap-6 md:grid-cols-2">
-                
-                {/* Smoke Test Health */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/10 backdrop-blur-md p-6 space-y-4 flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-base font-semibold text-white">Smoke Test Observabilitas</h3>
-                    <p className="text-xs text-zinc-400">Verifikasi status konektivitas eksternal database PostgreSQL dan API Gemini key.</p>
-                    
-                    {healthError && (
-                      <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-red-400 bg-red-500/10 border border-red-500/20 p-3 rounded-lg">
-                        <XCircle className="h-4 w-4 shrink-0" />
-                        <span>{healthError}</span>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card className="flex flex-col justify-between p-6">
+                <div>
+                  <SectionHeading title="Smoke Test Observabilitas" description="Verifikasi konektivitas database PostgreSQL dan API key Gemini." />
+                  {healthError ? (
+                    <div role="alert" className="mt-4 flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-xs font-medium text-destructive">
+                      {healthError}
+                    </div>
+                  ) : null}
+                  {healthData ? (
+                    <dl className="mt-4 space-y-2">
+                      <div className="flex items-center justify-between rounded-lg border border-border bg-accent/40 px-3 py-2 text-sm">
+                        <dt className="text-muted-foreground">Status API</dt>
+                        <dd><StatusPill tone="success">{String(healthData.status ?? "ok").toUpperCase()}</StatusPill></dd>
                       </div>
-                    )}
-
-                    {healthData && (
-                      <div className="mt-4 space-y-3">
-                        <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg p-3 flex items-center justify-between text-sm">
-                          <span className="text-zinc-400 font-medium">Status API</span>
-                          <span className="font-bold text-emerald-400 uppercase">{healthData.status}</span>
-                        </div>
-                        <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg p-3 flex items-center justify-between text-sm">
-                          <span className="text-zinc-400 font-medium">Latensi DB</span>
-                          <span className="font-bold text-zinc-200">{healthData.database?.latencyMs} ms</span>
-                        </div>
-                        <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg p-3 flex items-center justify-between text-sm">
-                          <span className="text-zinc-400 font-medium">Lingkungan Run</span>
-                          <span className="font-bold text-zinc-400 capitalize">{healthData.environment}</span>
-                        </div>
+                      <div className="flex items-center justify-between rounded-lg border border-border bg-accent/40 px-3 py-2 text-sm">
+                        <dt className="text-muted-foreground">Latensi DB</dt>
+                        <dd className="font-semibold tabular-nums text-foreground">{healthData.database?.latencyMs} ms</dd>
                       </div>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={fetchHealth}
-                    disabled={isCheckingHealth}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-sm font-bold py-2.5 text-white transition-all mt-4 disabled:opacity-50"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${isCheckingHealth ? "animate-spin" : ""}`} />
-                    <span>Jalankan Live Health Check</span>
-                  </button>
+                      <div className="flex items-center justify-between rounded-lg border border-border bg-accent/40 px-3 py-2 text-sm">
+                        <dt className="text-muted-foreground">Lingkungan</dt>
+                        <dd className="font-medium capitalize text-foreground">{healthData.environment}</dd>
+                      </div>
+                    </dl>
+                  ) : !healthError ? (
+                    <p className="mt-4 text-xs text-muted-foreground">Menjalankan pemeriksaan…</p>
+                  ) : null}
                 </div>
+                <Button variant="primary" className="mt-6 w-full" onClick={fetchHealth} disabled={isCheckingHealth}>
+                  <RefreshCw className={`h-4 w-4 ${isCheckingHealth ? "animate-spin" : ""}`} aria-hidden />
+                  Jalankan Health Check
+                </Button>
+              </Card>
 
-                {/* Raw response */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/10 backdrop-blur-md p-6 space-y-2">
-                  <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">Respons Payload Mentah</h3>
-                  <div className="bg-zinc-950/80 border border-zinc-800/80 rounded-xl p-4 text-xs font-mono text-zinc-300 overflow-auto max-h-64">
-                    {healthData ? (
-                      <pre>{JSON.stringify(healthData, null, 2)}</pre>
-                    ) : (
-                      <span className="text-zinc-600">Klik tombol di sebelah kiri untuk melihat output respons JSON.</span>
-                    )}
-                  </div>
+              <Card className="space-y-3 p-6">
+                <SectionHeading title="Payload Respons Mentah" description="Output JSON dari endpoint health." />
+                <div className="max-h-72 overflow-auto rounded-xl border border-border bg-accent/40 p-4">
+                  {healthData ? (
+                    <pre className="font-mono text-xs text-foreground">{JSON.stringify(healthData, null, 2)}</pre>
+                  ) : (
+                    <EmptyState icon={Server} title="Belum ada data" description="Jalankan health check untuk melihat respons." />
+                  )}
                 </div>
-
-              </div>
-
+              </Card>
             </div>
           )}
-
-          {/* TAB CONTENT: GLOBAL ACTIVITY LOGS */}
-          {activeTab === "activity" && (
-            <div className="space-y-4">
-              
-              {/* Search Control & Refresh */}
-              <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                  <input
-                    type="text"
-                    placeholder="Cari log berdasarkan tipe, nama, email, atau metadata..."
-                    value={adminActivitySearch}
-                    onChange={e => setAdminActivitySearch(e.target.value)}
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-900/40 py-2.5 pl-10 pr-4 text-sm text-white placeholder-zinc-500 outline-none transition focus:border-violet-500"
-                  />
-                </div>
-                <button
-                  onClick={fetchAdminActivities}
-                  disabled={loadingAdminActivities}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-zinc-850 hover:bg-zinc-800 text-xs font-semibold py-2.5 px-4 text-zinc-300 transition-all shrink-0 border border-zinc-750"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${loadingAdminActivities ? "animate-spin" : ""}`} />
-                  <span>Segarkan</span>
-                </button>
-              </div>
-
-              {adminActivityError && (
-                <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300 font-medium">
-                  {adminActivityError}
-                </p>
-              )}
-
-              {/* Table */}
-              <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/10 backdrop-blur-md relative">
-                <BorderBeam size={100} duration={8} borderWidth={1} colorFrom="#7c3aed" colorTo="#3b82f6" />
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm text-zinc-300">
-                    <thead className="border-b border-zinc-800 bg-zinc-950/40 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                      <tr>
-                        <th className="px-4 py-3">Waktu</th>
-                        <th className="px-4 py-3">Pengguna</th>
-                        <th className="px-4 py-3">Tipe Aktivitas</th>
-                        <th className="px-4 py-3">Detail & Keterangan</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-800/60 bg-zinc-900/10">
-                      {loadingAdminActivities ? (
-                        <tr>
-                          <td colSpan={4} className="px-4 py-8 text-center text-zinc-500">
-                            <span className="inline-flex items-center gap-2">
-                              <RefreshCw className="h-4 w-4 animate-spin text-violet-500" />
-                              Memuat log aktivitas...
-                            </span>
-                          </td>
-                        </tr>
-                      ) : filteredAdminActivities.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="px-4 py-8 text-center text-zinc-500">
-                            Tidak ada log aktivitas ditemukan.
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredAdminActivities.map(act => {
-                          let displayType = String(act.type);
-                          let colorClass = "text-zinc-300";
-                          let detailString = "";
-                          const md = act.metadata as Record<string, unknown> | undefined;
-
-                          if (act.type === "login_success") {
-                            displayType = "Masuk Log Berhasil";
-                            colorClass = "text-emerald-400 font-semibold";
-                            detailString = typeof md?.email === "string" ? `Email: ${md.email}` : "";
-                          } else if (act.type === "login_failed") {
-                            displayType = "Masuk Log Gagal";
-                            colorClass = "text-red-400 font-semibold";
-                            detailString = typeof md?.email === "string" ? `Email: ${md.email} (${md.reason || ""})` : "";
-                          } else if (act.type === "register_success") {
-                            displayType = "Registrasi Akun Baru";
-                            colorClass = "text-violet-400 font-semibold";
-                            detailString = typeof md?.email === "string" ? `Email: ${md.email}` : "";
-                          } else if (act.type === "register_failed") {
-                            displayType = "Registrasi Gagal";
-                            colorClass = "text-red-400 font-semibold";
-                            detailString = typeof md?.email === "string" ? `Email: ${md.email} (${md.reason || ""})` : "";
-                          } else if (act.type === "settings_saved") {
-                            displayType = "Pengaturan Disimpan";
-                            colorClass = "text-blue-400 font-semibold";
-                            detailString = `Model: ${md?.defaultModel ?? ""}`;
-                          } else if (act.type === "share_enabled") {
-                            displayType = "Membagikan Percakapan";
-                            colorClass = "text-teal-400 font-semibold";
-                            detailString = typeof md?.conversationTitle === "string" ? `"${md.conversationTitle}"` : "";
-                          } else if (act.type === "share_disabled") {
-                            displayType = "Menghentikan Berbagi";
-                            colorClass = "text-amber-400 font-semibold";
-                            detailString = typeof md?.conversationTitle === "string" ? `"${md.conversationTitle}"` : "";
-                          } else if (act.type === "file_uploaded") {
-                            displayType = "Mengunggah File";
-                            colorClass = "text-indigo-400 font-semibold";
-                            const size = typeof md?.sizeBytes === "number" ? md.sizeBytes : 0;
-                            detailString = typeof md?.filename === "string" ? `${md.filename} (${(size / 1024).toFixed(1)} KB)` : "";
-                          }
-
-                          return (
-                            <tr key={act.id} className="hover:bg-zinc-800/10 transition-colors">
-                              <td className="px-4 py-3 text-zinc-400 text-xs shrink-0 whitespace-nowrap">
-                                {new Date(act.createdAt).toLocaleString("id-ID", {
-                                  dateStyle: "medium",
-                                  timeStyle: "short",
-                                })}
-                              </td>
-                              <td className="px-4 py-3">
-                                <div>
-                                  <span className="font-semibold text-zinc-200 block truncate max-w-[180px]">
-                                    {act.userName || "Guest / Unauthenticated"}
-                                  </span>
-                                  {act.userEmail && (
-                                    <span className="block text-[10px] text-zinc-500 truncate max-w-[180px]">
-                                      {act.userEmail}
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3">
-                                <span className={`text-xs ${colorClass}`}>{displayType}</span>
-                              </td>
-                              <td className="px-4 py-3 text-xs text-zinc-400 max-w-xs truncate">
-                                {detailString || JSON.stringify(act.metadata)}
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-            </div>
-          )}
-
         </section>
       </div>
-    </main>
-  );
-}
 
-function StatCard({
-  title,
-  value,
-  icon: Icon,
-  desc,
-}: {
-  title: string;
-  value: number;
-  icon: React.ElementType;
-  desc: string;
-}): React.ReactElement {
-  return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/20 backdrop-blur-md p-6 flex items-start justify-between hover:border-zinc-700/60 transition-colors">
-      <div className="space-y-2">
-        <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">{title}</span>
-        <p className="text-3xl font-extrabold text-white tracking-tight">{value}</p>
-        <span className="text-[11px] text-zinc-400 block">{desc}</span>
-      </div>
-      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-950/80 border border-zinc-800">
-        <Icon className="h-5 w-5 text-violet-400" />
-      </div>
-    </div>
+      {dialog}
+      <KnowledgeFormModal
+        open={knowledgeModalOpen}
+        initial={knowledgeEditing}
+        isSaving={savingKnowledge}
+        onClose={() => {
+          setKnowledgeModalOpen(false);
+          setKnowledgeEditing(null);
+        }}
+        onSubmit={handleSubmitKnowledge}
+      />
+    </main>
   );
 }

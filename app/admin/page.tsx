@@ -39,6 +39,13 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     maxPromptLength: data.currentSettings.maxPromptLength,
     maxMessagesPerUserPerDay: data.currentSettings.maxMessagesPerUserPerDay ?? 50,
     rateLimitMessagesPerMinute: data.currentSettings.rateLimitMessagesPerMinute ?? 10,
+    toolsEnabled: data.currentSettings.toolsEnabled ?? true,
+    imageToolEnabled: data.currentSettings.imageToolEnabled ?? true,
+    knowledgeToolEnabled: data.currentSettings.knowledgeToolEnabled ?? true,
+    memoryToolEnabled: data.currentSettings.memoryToolEnabled ?? true,
+    guardrailsEnabled: data.currentSettings.guardrailsEnabled ?? true,
+    blockedKeywords: data.currentSettings.blockedKeywords ?? null,
+    maxToolCallsPerMessage: data.currentSettings.maxToolCallsPerMessage ?? 4,
   };
 
   return (

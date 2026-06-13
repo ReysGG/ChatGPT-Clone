@@ -26,6 +26,7 @@ model User {
   promptTemplates PromptTemplate[]
   memories      Memory[]
   uploads       Upload[]
+  knowledgeEntries KnowledgeEntry[]
 }
 
 model Session {
@@ -109,6 +110,13 @@ model Setting {
   systemPrompt  String?
   temperature   Float    @default(0.7)
   darkMode      Boolean  @default(true)
+  // Agentic tools & guardrails (per-user overrides)
+  toolsEnabled         Boolean @default(true)
+  imageToolEnabled     Boolean @default(true)
+  knowledgeToolEnabled Boolean @default(true)
+  memoryToolEnabled    Boolean @default(true)
+  guardrailsEnabled    Boolean @default(true)
+  blockedKeywords      String? // comma-separated extra keywords to block
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -165,6 +173,23 @@ model Memory {
   @@index([userId])
 }
 
+model KnowledgeEntry {
+  id        String   @id @default(cuid())
+  userId    String? // null = global (dipasang admin), dipakai untuk semua user
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  content   String
+  tags      String? // comma-separated tags for lightweight filtering
+  enabled   Boolean  @default(true)
+  isGlobal  Boolean  @default(false) // true = knowledge global yang dikelola admin
+  source    String? // e.g. "admin" | "manual" | "upload" | "import"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([isGlobal, enabled])
+}
+
 model Upload {
   id             String        @id @default(cuid())
   userId         String
@@ -216,6 +241,14 @@ model AppSetting {
   maxPromptLength            Int      @default(4000)
   maxMessagesPerUserPerDay   Int      @default(50)
   rateLimitMessagesPerMinute Int      @default(10)
+  // Agentic tools & guardrails (global master switches)
+  toolsEnabled               Boolean  @default(true)
+  imageToolEnabled           Boolean  @default(true)
+  knowledgeToolEnabled       Boolean  @default(true)
+  memoryToolEnabled          Boolean  @default(true)
+  guardrailsEnabled          Boolean  @default(true)
+  blockedKeywords            String?  // global comma-separated keywords to block
+  maxToolCallsPerMessage     Int      @default(4)
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
 }

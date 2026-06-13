@@ -73,6 +73,14 @@ export interface AdminSettings {
   maxPromptLength: number;
   maxMessagesPerUserPerDay: number;
   rateLimitMessagesPerMinute: number;
+  // AI agentic tools & guardrails (global)
+  toolsEnabled: boolean;
+  imageToolEnabled: boolean;
+  knowledgeToolEnabled: boolean;
+  memoryToolEnabled: boolean;
+  guardrailsEnabled: boolean;
+  blockedKeywords: string | null;
+  maxToolCallsPerMessage: number;
 }
 
 export interface AdminDashboardDataResponse {

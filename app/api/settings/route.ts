@@ -12,19 +12,40 @@ const SettingsSchema = z.object({
   defaultModel: z.string().trim().min(1).max(80),
   systemPrompt: z.string().trim().max(4000).nullish().transform((v) => v || null),
   temperature: z.coerce.number().min(0).max(2),
+  // Agentic tools & guardrails (all optional so older clients keep working)
+  toolsEnabled: z.boolean().optional(),
+  imageToolEnabled: z.boolean().optional(),
+  knowledgeToolEnabled: z.boolean().optional(),
+  memoryToolEnabled: z.boolean().optional(),
+  guardrailsEnabled: z.boolean().optional(),
+  blockedKeywords: z.string().trim().max(2000).nullish().transform((v) => (v === undefined ? undefined : v || null)),
 });
 
-function serializeSettings(settings: {
+type SettingsLike = {
   defaultModel: string | null;
   systemPrompt: string | null;
   temperature: number;
-}) {
+  toolsEnabled?: boolean | null;
+  imageToolEnabled?: boolean | null;
+  knowledgeToolEnabled?: boolean | null;
+  memoryToolEnabled?: boolean | null;
+  guardrailsEnabled?: boolean | null;
+  blockedKeywords?: string | null;
+};
+
+function serializeSettings(settings: SettingsLike) {
   return {
     defaultModel: settings.defaultModel || DEFAULT_MODEL,
     // Return null/empty so the chat API can fall through to the global admin system prompt.
     // Only return the personal prompt if the user has explicitly set one.
     systemPrompt: settings.systemPrompt?.trim() || null,
     temperature: settings.temperature,
+    toolsEnabled: settings.toolsEnabled ?? true,
+    imageToolEnabled: settings.imageToolEnabled ?? true,
+    knowledgeToolEnabled: settings.knowledgeToolEnabled ?? true,
+    memoryToolEnabled: settings.memoryToolEnabled ?? true,
+    guardrailsEnabled: settings.guardrailsEnabled ?? true,
+    blockedKeywords: settings.blockedKeywords ?? null,
   };
 }
 

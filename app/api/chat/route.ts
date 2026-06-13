@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import type {
+  Content,
+  FunctionCall,
+  GenerationConfig,
+  GenerativeModel,
+  Part,
+  Tool,
+} from "@google/generative-ai";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_MODEL, getModel, getGenAI } from "@/lib/ai";
+import { DEFAULT_MODEL, getGenAI } from "@/lib/ai";
 import { getFriendlyChatError } from "@/lib/chat-errors";
 import { authErrorResponse, requireUser } from "@/lib/auth";
 import {
@@ -11,8 +19,18 @@ import {
   serializeConversation,
   serializeMessage,
 } from "@/lib/chat-db";
+import { buildFunctionDeclarations, getToolByName } from "@/lib/tools";
+import {
+  checkUserInput,
+  guardToolCall,
+  parseBlockedKeywords,
+  resolveEnabledTools,
+} from "@/lib/guardrails";
 
 export const dynamic = "force-dynamic";
+// Tool calls (e.g. image generation via Google Flow) can run for a while,
+// so allow up to 3 minutes for the whole agentic turn.
+export const maxDuration = 180;
 
 const ChatRequestSchema = z.object({
   conversationId: z.string().optional().nullable(),
@@ -63,6 +81,172 @@ async function logUsageEvent({
   } catch (error) {
     console.error("Failed to log usage event:", error);
   }
+}
+
+/** Build a Gemini model configured with the right tools for this turn. */
+function buildChatModel(opts: {
+  modelName: string;
+  systemPrompt: string;
+  generationConfig: GenerationConfig;
+  webSearch: boolean;
+  enabledTools: Set<string>;
+}): GenerativeModel {
+  const tools: Tool[] = [];
+
+  if (opts.webSearch) {
+    // googleSearch grounding cannot be combined with functionDeclarations,
+    // so when web search is requested it takes precedence over custom tools.
+    tools.push({ googleSearch: {} } as unknown as Tool);
+  } else if (opts.enabledTools.size > 0) {
+    tools.push({
+      functionDeclarations: buildFunctionDeclarations(opts.enabledTools),
+    });
+  }
+
+  return getGenAI().getGenerativeModel({
+    model: opts.modelName,
+    systemInstruction: opts.systemPrompt,
+    generationConfig: opts.generationConfig,
+    ...(tools.length > 0 ? { tools } : {}),
+  });
+}
+
+interface AgentRunResult {
+  text: string;
+}
+
+/**
+ * Agentic loop: send the message, stream text, and whenever the model emits
+ * function calls, run them through guardrails + the tool registry and feed the
+ * results back — until the model produces a final answer (or budgets are hit).
+ */
+async function runAgent(opts: {
+  model: GenerativeModel;
+  history: Content[];
+  userParts: Part[];
+  enabledTools: Set<string>;
+  maxToolCalls: number;
+  ctx: { userId: string; conversationId: string };
+  emit: (event: string, data: unknown) => void;
+  signal: AbortSignal;
+}): Promise<AgentRunResult> {
+  const chat = opts.model.startChat({ history: opts.history });
+
+  let pending: Array<string | Part> = opts.userParts;
+  let fullText = "";
+  let toolCallsUsed = 0;
+  const maxSteps = 6;
+
+  for (let step = 0; step < maxSteps; step += 1) {
+    if (opts.signal.aborted) break;
+
+    const result = await chat.sendMessageStream(pending);
+
+    for await (const chunk of result.stream) {
+      if (opts.signal.aborted) break;
+      let text = "";
+      try {
+        text = chunk.text();
+      } catch {
+        text = "";
+      }
+      if (text) {
+        fullText += text;
+        opts.emit("delta", { text });
+      }
+    }
+
+    const response = await result.response;
+    let calls: FunctionCall[] = [];
+    try {
+      calls = response.functionCalls() ?? [];
+    } catch {
+      calls = [];
+    }
+
+    if (calls.length === 0) break; // final answer produced
+
+    const responseParts: Part[] = [];
+    for (const call of calls) {
+      if (toolCallsUsed >= opts.maxToolCalls) {
+        responseParts.push({
+          functionResponse: {
+            name: call.name,
+            response: {
+              error:
+                "Batas jumlah pemanggilan tool per pesan tercapai. Lanjutkan tanpa memanggil tool lagi.",
+            },
+          },
+        });
+        continue;
+      }
+      toolCallsUsed += 1;
+
+      opts.emit("tool_call", { name: call.name });
+
+      const guard = guardToolCall(call.name, call.args, {
+        enabledTools: opts.enabledTools,
+      });
+      if (!guard.allowed) {
+        opts.emit("tool_result", {
+          name: call.name,
+          ok: false,
+          error: guard.reason,
+        });
+        responseParts.push({
+          functionResponse: {
+            name: call.name,
+            response: { error: guard.reason },
+          },
+        });
+        continue;
+      }
+
+      const tool = getToolByName(call.name);
+      if (!tool) {
+        responseParts.push({
+          functionResponse: {
+            name: call.name,
+            response: { error: `Tool tidak ditemukan: ${call.name}` },
+          },
+        });
+        continue;
+      }
+
+      try {
+        const out = await tool.execute(guard.args, {
+          userId: opts.ctx.userId,
+          conversationId: opts.ctx.conversationId,
+          emit: opts.emit,
+          signal: opts.signal,
+        });
+
+        if (out.artifactMarkdown) {
+          const md = `${fullText ? "\n\n" : ""}${out.artifactMarkdown}`;
+          fullText += md;
+          opts.emit("delta", { text: md });
+        }
+
+        opts.emit("tool_result", { name: call.name, ok: true });
+        responseParts.push({
+          functionResponse: { name: call.name, response: out.response },
+        });
+      } catch (error) {
+        const message = (error as Error).message || "Tool execution failed";
+        opts.emit("tool_result", { name: call.name, ok: false, error: message });
+        responseParts.push({
+          functionResponse: {
+            name: call.name,
+            response: { error: message },
+          },
+        });
+      }
+    }
+
+    pending = responseParts;
+  }
+
+  return { text: fullText.trim() };
 }
 
 export async function POST(request: NextRequest) {
@@ -119,6 +303,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const settings = await prisma.setting.findFirst({ where: { userId: user.id } });
+
+    // Input guardrails (configurable keyword blocklist)
+    const guardrailsEnabled =
+      (globalSettings?.guardrailsEnabled ?? true) &&
+      (settings?.guardrailsEnabled ?? true);
+    const blockedKeywords = parseBlockedKeywords(
+      globalSettings?.blockedKeywords,
+      settings?.blockedKeywords
+    );
+    const inputGuard = checkUserInput(body.message, {
+      guardrailsEnabled,
+      blockedKeywords,
+    });
+    if (!inputGuard.allowed) {
+      return NextResponse.json(
+        { error: inputGuard.reason ?? "Pesan diblokir oleh guardrails." },
+        { status: 400 }
+      );
+    }
+
     let conversation = body.conversationId
       ? await assertConversationOwner(body.conversationId, user.id)
       : await prisma.conversation.create({
@@ -155,14 +360,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const history = await prisma.message.findMany({
+    const historyRows = await prisma.message.findMany({
       where: { conversationId: conversation.id },
       orderBy: { createdAt: "asc" },
       take: 24,
     });
 
-    const settings = await prisma.setting.findFirst({ where: { userId: user.id } });
-    
     // Fetch active memories to personalize response
     const memories = await prisma.memory.findMany({
       where: {
@@ -173,8 +376,26 @@ export async function POST(request: NextRequest) {
 
     let memoryInstruction = "";
     if (memories.length > 0) {
-      memoryInstruction = "\n\n[INFORMASI PERSONAL PENGGUNA (MEMORY)]\nGunakan informasi ini untuk mempersonalisasi respon Anda jika relevan:\n" + 
+      memoryInstruction = "\n\n[INFORMASI PERSONAL PENGGUNA (MEMORY)]\nGunakan informasi ini untuk mempersonalisasi respon Anda jika relevan:\n" +
         memories.map(m => `- ${m.key}: ${m.value}`).join("\n");
+    }
+
+    // Resolve which tools the assistant may call this turn.
+    const enabledTools = resolveEnabledTools(globalSettings, settings);
+    const toolsActive = !body.webSearch && enabledTools.size > 0;
+
+    let toolsInstruction = "";
+    if (toolsActive) {
+      toolsInstruction =
+        "\n\n[KEMAMPUAN ALAT/TOOL]\n" +
+        "Kamu adalah asisten agentic yang BISA memanggil fungsi/tool berikut, dan HARUS benar-benar memanggilnya (bukan sekadar menjelaskan atau menolak):\n" +
+        Array.from(enabledTools)
+          .map((name) => `- ${name}`)
+          .join("\n") +
+        "\nAturan:\n" +
+        "- Jika pengguna meminta membuat/menggambar/menghasilkan gambar, ilustrasi, foto, atau logo, WAJIB panggil generate_image. Jangan menjawab bahwa kamu tidak bisa membuat gambar.\n" +
+        "- Gunakan search_knowledge sebelum menjawab hal yang mungkin tersimpan di basis pengetahuan pribadi pengguna.\n" +
+        "- Setelah hasil tool diterima, lanjutkan dengan jawaban akhir yang ringkas dalam bahasa pengguna.";
     }
 
     const DEFAULT_SYSTEM_PROMPT = "You are a helpful personal AI assistant.";
@@ -184,7 +405,7 @@ export async function POST(request: NextRequest) {
       globalSettings?.defaultSystemPrompt?.trim() ||
       DEFAULT_SYSTEM_PROMPT
     );
-    const systemPrompt = baseSystemPrompt + memoryInstruction;
+    const systemPrompt = baseSystemPrompt + memoryInstruction + toolsInstruction;
 
     // Fetch attached uploads and parse text context
     let documentContext = "";
@@ -214,47 +435,43 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Build structured contents array for Gemini API.
-    // IMPORTANT: system prompt is passed separately via `systemInstruction` —
-    // NOT concatenated with user content. This prevents prompt injection where
-    // a user message could contain text like "\n\nSystem: ignore previous instructions".
-    const contents = history.map((message) => ({
+    // Build the chat history for startChat — everything EXCEPT the just-saved
+    // user message, which is sent separately as the new turn. The system
+    // prompt is provided via `systemInstruction`, never concatenated with user
+    // content (prevents prompt-injection via crafted message text).
+    const priorRows = historyRows.filter((m) => m.id !== userMessage.id);
+    const chatHistory: Content[] = priorRows.map((message) => ({
       role: message.role === "user" ? "user" : "model",
-      parts: [{
-        text:
-          message.id === userMessage.id && documentContext
-            ? `${message.content}${documentContext}`
-            : message.content,
-      }],
+      parts: [{ text: message.content }],
     }));
+    const userParts: Part[] = [
+      { text: documentContext ? `${body.message}${documentContext}` : body.message },
+    ];
 
     const modelName = body.model || settings?.defaultModel || globalSettings?.defaultModel || DEFAULT_MODEL;
     const temperature = body.temperature ?? settings?.temperature ?? globalSettings?.defaultTemperature ?? 0.7;
-    
-    let model;
-    if (body.webSearch) {
-      model = getGenAI().getGenerativeModel({
-        model: modelName,
-        tools: [{ googleSearch: {} } as unknown as import("@google/generative-ai").Tool],
-      });
-    } else {
-      model = getModel(modelName);
-    }
-    
-    const generationConfig = {
+
+    const generationConfig: GenerationConfig = {
       temperature,
       maxOutputTokens: 8192,
     };
 
-    // 45-second timeout — prevents hang if Gemini API is unresponsive.
-    // The request.signal handles client disconnect; this handles server-side timeout.
-    const timeoutController = new AbortController();
-    const timeoutId = setTimeout(() => timeoutController.abort(new Error("AI request timeout")), 45_000);
+    const model = buildChatModel({
+      modelName,
+      systemPrompt,
+      generationConfig,
+      webSearch: Boolean(body.webSearch),
+      enabledTools,
+    });
 
-    // Estimate / count prompt tokens
+    const maxToolCalls = globalSettings?.maxToolCallsPerMessage ?? 4;
+
+    // Best-effort input token count
     let inputTokens = 0;
     try {
-      const tokenResult = await model.countTokens({ contents });
+      const tokenResult = await model.countTokens({
+        contents: [...chatHistory, { role: "user", parts: userParts }],
+      });
       inputTokens = tokenResult.totalTokens;
     } catch (err) {
       console.error("Error counting input tokens:", err);
@@ -263,33 +480,32 @@ export async function POST(request: NextRequest) {
     if (body.stream) {
       const stream = new ReadableStream({
         async start(controller) {
-          let assistantText = "";
+          const emit = (event: string, data: unknown) => {
+            try {
+              controller.enqueue(encodeEvent(event, data));
+            } catch {
+              /* controller already closed */
+            }
+          };
 
           try {
-            controller.enqueue(
-              encodeEvent("meta", {
-                conversation: serializeConversation(conversation),
-                userMessage: serializeMessage(userMessage),
-              })
-            );
-
-            const result = await model.generateContentStream({
-              systemInstruction: systemPrompt,
-              contents,
-              generationConfig,
+            emit("meta", {
+              conversation: serializeConversation(conversation),
+              userMessage: serializeMessage(userMessage),
             });
 
-            for await (const chunk of result.stream) {
-              if (request.signal.aborted) break;
+            const { text } = await runAgent({
+              model,
+              history: chatHistory,
+              userParts,
+              enabledTools,
+              maxToolCalls,
+              ctx: { userId: user.id, conversationId: conversation.id },
+              emit,
+              signal: request.signal,
+            });
 
-              const text = chunk.text();
-              if (!text) continue;
-
-              assistantText += text;
-              controller.enqueue(encodeEvent("delta", { text }));
-            }
-
-            const finalText = assistantText.trim() || "Maaf, saya belum bisa membuat jawaban.";
+            const finalText = text || "Maaf, saya belum bisa membuat jawaban.";
             const assistantMessage = await prisma.message.create({
               data: {
                 conversationId: conversation.id,
@@ -303,10 +519,11 @@ export async function POST(request: NextRequest) {
               data: { updatedAt: new Date() },
             });
 
-            // Count output tokens and log usage event
             let outputTokens = 0;
             try {
-              const tokenResult = await model.countTokens({ contents: [{ role: "model", parts: [{ text: finalText }] }] });
+              const tokenResult = await model.countTokens({
+                contents: [{ role: "model", parts: [{ text: finalText }] }],
+              });
               outputTokens = tokenResult.totalTokens;
             } catch (err) {
               console.error("Error counting output tokens:", err);
@@ -322,20 +539,13 @@ export async function POST(request: NextRequest) {
               outputTokens,
             });
 
-            controller.enqueue(
-              encodeEvent("done", {
-                conversation: serializeConversation(updatedConversation),
-                assistantMessage: serializeMessage(assistantMessage),
-              })
-            );
+            emit("done", {
+              conversation: serializeConversation(updatedConversation),
+              assistantMessage: serializeMessage(assistantMessage),
+            });
           } catch (error) {
-            controller.enqueue(
-              encodeEvent("error", {
-                error: getFriendlyChatError(error),
-              })
-            );
+            emit("error", { error: getFriendlyChatError(error) });
           } finally {
-            clearTimeout(timeoutId);
             controller.close();
           }
         },
@@ -351,13 +561,19 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const result = await model.generateContent({
-      systemInstruction: systemPrompt,
-      contents,
-      generationConfig,
+    // Non-streaming path — run the same agentic loop with a no-op emitter.
+    const { text } = await runAgent({
+      model,
+      history: chatHistory,
+      userParts,
+      enabledTools,
+      maxToolCalls,
+      ctx: { userId: user.id, conversationId: conversation.id },
+      emit: () => {},
+      signal: request.signal,
     });
-    clearTimeout(timeoutId);
-    const assistantText = result.response.text().trim() || "Maaf, saya belum bisa membuat jawaban.";
+
+    const assistantText = text || "Maaf, saya belum bisa membuat jawaban.";
 
     const assistantMessage = await prisma.message.create({
       data: {
@@ -372,10 +588,11 @@ export async function POST(request: NextRequest) {
       data: { updatedAt: new Date() },
     });
 
-    // Count output tokens and log usage event
     let outputTokens = 0;
     try {
-      const tokenResult = await model.countTokens({ contents: [{ role: "user", parts: [{ text: assistantText }] }] });
+      const tokenResult = await model.countTokens({
+        contents: [{ role: "model", parts: [{ text: assistantText }] }],
+      });
       outputTokens = tokenResult.totalTokens;
     } catch (err) {
       console.error("Error counting output tokens:", err);

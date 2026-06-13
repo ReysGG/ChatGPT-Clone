@@ -386,6 +386,7 @@ export function useChatState(): UseChatState {
         let confirmedChatId = optimisticChatId;
         let confirmedUserMessage: Message | null = null;
         let streamedText = "";
+        let usedTool = false;
 
         try {
           const response = await fetch("/api/chat", {
@@ -473,6 +474,37 @@ export function useChatState(): UseChatState {
                 continue;
               }
 
+              // The agent called a tool that streams progress (e.g. image
+              // generation). Reuse the image-progress UI so the user sees it.
+              if (parsed.event === "progress") {
+                const data = parsed.data as { stage: string; message: string };
+                usedTool = true;
+                setIsGeneratingImage(true);
+                setImageGenProgress({
+                  stage: data.stage as ImageGenProgressState["stage"],
+                  message: data.message,
+                });
+                continue;
+              }
+
+              // Lightweight signal that the agent invoked a function.
+              if (parsed.event === "tool_call") {
+                const data = parsed.data as { name: string };
+                usedTool = true;
+                if (data.name === "generate_image") {
+                  setIsGeneratingImage(true);
+                  setImageGenProgress({
+                    stage: "connecting",
+                    message: "AI sedang membuat gambar...",
+                  });
+                }
+                continue;
+              }
+
+              if (parsed.event === "tool_result") {
+                continue;
+              }
+
               if (parsed.event === "done") {
                 const data = parsed.data as StreamDone;
                 const finalAssistantMessage = toMessage(data.assistantMessage);
@@ -527,6 +559,11 @@ export function useChatState(): UseChatState {
         } finally {
           setIsStreaming(false);
           abortRef.current = null;
+          if (usedTool) {
+            setIsGeneratingImage(false);
+            // Keep the final state briefly visible, then clear.
+            setTimeout(() => setImageGenProgress(null), 2000);
+          }
         }
       })();
     },

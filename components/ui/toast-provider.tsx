@@ -72,46 +72,34 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     >
       {children}
       {/* Toast Portal Container */}
-      <div className="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0">
+      <div className="fixed bottom-5 right-5 z-[9999] flex w-full max-w-sm flex-col gap-2 px-4 pointer-events-none sm:px-0">
         {toasts.map((t) => {
-          let icon = <Info className="size-5 text-blue-400" />;
-          let border = "border-blue-500/20";
-          let bg = "bg-blue-950/40";
-          let glow = "shadow-blue-500/5";
-
+          let icon = <Info className="size-5 text-primary" />;
           if (t.type === "success") {
-            icon = <CheckCircle2 className="size-5 text-emerald-400" />;
-            border = "border-emerald-500/20";
-            bg = "bg-emerald-950/40";
-            glow = "shadow-emerald-500/5";
+            icon = <CheckCircle2 className="size-5 text-[var(--color-fg-success-primary)]" />;
           } else if (t.type === "error") {
-            icon = <AlertCircle className="size-5 text-red-400" />;
-            border = "border-red-500/20";
-            bg = "bg-red-950/40";
-            glow = "shadow-red-500/5";
+            icon = <AlertCircle className="size-5 text-destructive" />;
           } else if (t.type === "warning") {
-            icon = <AlertTriangle className="size-5 text-amber-400" />;
-            border = "border-amber-500/20";
-            bg = "bg-amber-950/40";
-            glow = "shadow-amber-500/5";
+            icon = <AlertTriangle className="size-5 text-[#9a6700]" />;
           }
 
           return (
             <div
               key={t.id}
-              className={`pointer-events-auto flex items-start justify-between gap-3 rounded-xl border ${border} ${bg} backdrop-blur-md p-4 text-white shadow-lg ${glow} animate-slide-up-fade transition-all duration-300`}
+              className="pointer-events-auto flex items-start justify-between gap-3 rounded-xl border border-border bg-card p-4 text-foreground shadow-[0_4px_20px_rgba(0,0,0,0.08)] animate-slide-up-fade"
               role="alert"
             >
               <div className="flex gap-2.5">
                 <span className="mt-0.5 shrink-0">{icon}</span>
-                <p className="text-xs font-medium text-zinc-200 leading-relaxed">
+                <p className="text-xs font-medium leading-relaxed text-foreground">
                   {t.message}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => removeToast(t.id)}
-                className="shrink-0 rounded-md p-0.5 text-zinc-400 hover:bg-white/10 hover:text-white transition"
+                aria-label="Tutup notifikasi"
+                className="shrink-0 rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 <X className="size-3.5" />
               </button>

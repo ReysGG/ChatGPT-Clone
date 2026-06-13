@@ -15,6 +15,15 @@ const AdminSettingsSchema = z.object({
   maxPromptLength: z.coerce.number().int().min(1),
   maxMessagesPerUserPerDay: z.coerce.number().int().min(1),
   rateLimitMessagesPerMinute: z.coerce.number().int().min(1),
+  // Agentic tools & guardrails (global master switches). Optional so the
+  // existing admin form keeps working until the UI is updated.
+  toolsEnabled: z.boolean().optional(),
+  imageToolEnabled: z.boolean().optional(),
+  knowledgeToolEnabled: z.boolean().optional(),
+  memoryToolEnabled: z.boolean().optional(),
+  guardrailsEnabled: z.boolean().optional(),
+  blockedKeywords: z.string().trim().max(2000).nullish().transform((v) => (v === undefined ? undefined : v || null)),
+  maxToolCallsPerMessage: z.coerce.number().int().min(0).max(20).optional(),
 });
 
 export async function GET() {
@@ -68,6 +77,13 @@ export async function PUT(request: NextRequest) {
           maxPromptLength: body.maxPromptLength,
           maxMessagesPerUserPerDay: body.maxMessagesPerUserPerDay,
           rateLimitMessagesPerMinute: body.rateLimitMessagesPerMinute,
+          toolsEnabled: body.toolsEnabled,
+          imageToolEnabled: body.imageToolEnabled,
+          knowledgeToolEnabled: body.knowledgeToolEnabled,
+          memoryToolEnabled: body.memoryToolEnabled,
+          guardrailsEnabled: body.guardrailsEnabled,
+          blockedKeywords: body.blockedKeywords,
+          maxToolCallsPerMessage: body.maxToolCallsPerMessage,
         },
       });
     } else {
@@ -83,6 +99,13 @@ export async function PUT(request: NextRequest) {
           maxPromptLength: body.maxPromptLength,
           maxMessagesPerUserPerDay: body.maxMessagesPerUserPerDay,
           rateLimitMessagesPerMinute: body.rateLimitMessagesPerMinute,
+          toolsEnabled: body.toolsEnabled,
+          imageToolEnabled: body.imageToolEnabled,
+          knowledgeToolEnabled: body.knowledgeToolEnabled,
+          memoryToolEnabled: body.memoryToolEnabled,
+          guardrailsEnabled: body.guardrailsEnabled,
+          blockedKeywords: body.blockedKeywords,
+          maxToolCallsPerMessage: body.maxToolCallsPerMessage,
         },
       });
     }
